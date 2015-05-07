@@ -50,8 +50,6 @@ VarianObiHncRawToAttenuationImageFilter<TInputImage, TOutputImage>
   pathComponents.push_back(m_FloodImageFileName);
   std::string fullPathFileName = itksys::SystemTools::JoinPath(pathComponents);
 
-  std::cout << "FN: " << fullPathFileName << std::endl;
-
   // Reference image (flood field)
   HncImageIOFactory::RegisterOneFactory();
 
