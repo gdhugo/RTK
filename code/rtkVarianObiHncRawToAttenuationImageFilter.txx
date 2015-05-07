@@ -20,7 +20,9 @@
 #define __rtkVarianObiHncRawToAttenuationImageFilter_txx
 
 #include <itkImageFileReader.h>
+#include <itksys/SystemTools.hxx>
 
+#include "rtkHncImageIOFactory.h"
 #include "rtkMacro.h"
 
 namespace rtk
@@ -29,7 +31,8 @@ namespace rtk
 template <class TInputImage, class TOutputImage>
 VarianObiHncRawToAttenuationImageFilter<TInputImage, TOutputImage>
 ::VarianObiHncRawToAttenuationImageFilter() :
-  m_FloodImageFileName( "norm.hnc" )
+  m_FloodImageFileName( "norm.hnc" ),
+  m_ProjectionFileName( "./norm.hnc" )
 {
 }
 
@@ -38,11 +41,24 @@ void
 VarianObiHncRawToAttenuationImageFilter<TInputImage, TOutputImage>
 ::BeforeThreadedGenerateData()
 {
-  // Reference image (flood field)
-  typedef itk::ImageFileReader< InputImageType > HncImageType;
-  typename HncImageType::Pointer floodProjectionReader;
+  std::string path = itksys::SystemTools::GetFilenamePath(m_ProjectionFileName);
+  std::vector<std::string> pathComponents;
+  itksys::SystemTools::SplitPath(m_ProjectionFileName.c_str(), pathComponents);
+  //std::string fileName = pathComponents.back();
 
-  floodProjectionReader->SetFileName(m_FloodImageFileName );
+  pathComponents.pop_back();
+  pathComponents.push_back(m_FloodImageFileName);
+  std::string fullPathFileName = itksys::SystemTools::JoinPath(pathComponents);
+
+  std::cout << "FN: " << fullPathFileName << std::endl;
+
+  // Reference image (flood field)
+  HncImageIOFactory::RegisterOneFactory();
+
+  typedef itk::ImageFileReader< InputImageType > HncImageType;
+  typename HncImageType::Pointer floodProjectionReader = HncImageType::New();
+
+  floodProjectionReader->SetFileName( fullPathFileName );
   floodProjectionReader->Update();
   m_FloodImage = floodProjectionReader->GetOutput();
   m_FloodImage->DisconnectPipeline();

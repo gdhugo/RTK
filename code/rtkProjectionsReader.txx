@@ -520,6 +520,11 @@ void ProjectionsReader<TOutputImage>
   if(edf)
     edf->SetFileNames( this->GetFileNames() );
 
+  typedef rtk::VarianObiHncRawToAttenuationImageFilter<TInputImage, OutputImageType> HncRawFilterType;
+  HncRawFilterType *hnc = dynamic_cast<HncRawFilterType*>( m_RawToAttenuationFilter.GetPointer() );
+  if(hnc)
+    hnc->SetProjectionFileName( this->GetFileNames()[0] );
+
   // Water coefficients
   if(m_WaterPrecorrectionCoefficients.size() != 0)
     {

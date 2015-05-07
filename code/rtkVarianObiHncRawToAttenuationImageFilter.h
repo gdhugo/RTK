@@ -62,6 +62,9 @@ public:
   /** Runtime information support. */
   itkTypeMacro(VarianObiHncRawToAttenuationImageFilter, itk::ImageToImageFilter);
 
+  /** Get/Set the filename for path. */
+  itkSetMacro(ProjectionFileName, std::string);
+  itkGetMacro(ProjectionFileName, std::string);
 
 protected:
   VarianObiHncRawToAttenuationImageFilter();
@@ -78,6 +81,7 @@ private:
   void operator=(const Self&);
 
   std::string m_FloodImageFileName;
+  std::string m_ProjectionFileName;
   typename InputImageType::Pointer m_FloodImage;
 
 }; // end of class
