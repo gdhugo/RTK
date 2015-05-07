@@ -109,6 +109,14 @@ IF(RTK_USE_CUDA)
   ENDIF()
   INCLUDE_DIRECTORIES(${CUDA_INCLUDE_DIRS})
 ENDIF()
+
+# Find BZIP2 (required for Varian HNC)
+FIND_PACKAGE(BZip2)
+IF(BZIP2_FOUND)
+  INCLUDE_DIRECTORIES(${BZIP_INCLUDE_DIRS})
+ELSE(BZIP2_FOUND)
+  MESSAGE(FATAL_ERROR "Cannot build without bzip2.")
+ENDIF(BZIP2_FOUND)
 #=========================================================
 
 #=========================================================

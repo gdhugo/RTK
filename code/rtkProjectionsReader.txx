@@ -36,6 +36,9 @@
 #include "rtkHndImageIOFactory.h"
 #include "rtkVarianObiRawImageFilter.h"
 
+#include "rtkHncImageIOFactory.h"
+#include "rtkVarianObiHncRawToAttenuationImageFilter.h"
+
 // Elekta Synergy includes
 #include "rtkHisImageIOFactory.h"
 #include "rtkElektaSynergyLookupTableImageFilter.h"
@@ -192,6 +195,42 @@ void ProjectionsReader<TOutputImage>
       typename RawFilterType::Pointer rawFilter = RawFilterType::New();
       m_RawToAttenuationFilter = rawFilter;
       }
+    else if( !strcmp(imageIO->GetNameOfClass(), "HncImageIO") )
+      {
+      /////////// Varian OBI HNC
+      typedef unsigned short                                     InputPixelType;
+      typedef itk::Image< InputPixelType, OutputImageDimension > InputImageType;
+
+      // Reader
+      typedef itk::ImageSeriesReader< InputImageType > ReaderType;
+      typename ReaderType::Pointer reader = ReaderType::New();
+      m_RawDataReader = reader;
+
+      // Change information
+      typedef itk::ChangeInformationImageFilter< InputImageType > ChangeInfoType;
+      typename ChangeInfoType::Pointer cif = ChangeInfoType::New();
+      m_ChangeInformationFilter = cif;
+
+      // Crop
+      typedef itk::CropImageFilter< InputImageType, InputImageType > CropType;
+      typename CropType::Pointer crop = CropType::New();
+      m_CropFilter = crop;
+
+      // Bin
+      typedef itk::BinShrinkImageFilter< InputImageType, InputImageType > BinType;
+      typename BinType::Pointer bin = BinType::New();
+      m_BinningFilter = bin;
+
+      // Scatter correction
+      typedef rtk::BoellaardScatterCorrectionImageFilter<InputImageType, InputImageType>  ScatterFilterType;
+      typename ScatterFilterType::Pointer scatter = ScatterFilterType::New();
+      m_ScatterFilter = scatter;
+
+      // Convert raw to Projections
+      typedef rtk::VarianObiHncRawToAttenuationImageFilter<InputImageType, OutputImageType> RawFilterType;
+      typename RawFilterType::Pointer rawFilter = RawFilterType::New();
+      m_RawToAttenuationFilter = rawFilter;
+      }  
     else if( !strcmp(imageIO->GetNameOfClass(), "HisImageIO") ||
              !strcmp(imageIO->GetNameOfClass(), "DCMImagXImageIO") ||
              !strcmp(imageIO->GetNameOfClass(), "ImagXImageIO") ||
@@ -287,6 +326,7 @@ void ProjectionsReader<TOutputImage>
       !strcmp(imageIO->GetNameOfClass(), "DCMImagXImageIO") ||
       !strcmp(imageIO->GetNameOfClass(), "ImagXImageIO") ||
       !strcmp(imageIO->GetNameOfClass(), "TIFFImageIO") ||
+      !strcmp(imageIO->GetNameOfClass(), "HncImageIO") ||
       imageIO->GetComponentType() == itk::ImageIOBase::USHORT )
     PropagateParametersToMiniPipeline< itk::Image<unsigned short, OutputImageDimension> >();
   else if( !strcmp(imageIO->GetNameOfClass(), "HndImageIO") )

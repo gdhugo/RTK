@@ -13,6 +13,8 @@ ADD_LIBRARY(RTK
             rtkDbf.cxx
             rtkHndImageIO.cxx
             rtkHndImageIOFactory.cxx
+            rtkHncImageIO.cxx
+            rtkHncImageIOFactory.cxx
             rtkVarianObiXMLFileReader.cxx
             rtkVarianObiGeometryReader.cxx
             rtkEdfImageIO.cxx
