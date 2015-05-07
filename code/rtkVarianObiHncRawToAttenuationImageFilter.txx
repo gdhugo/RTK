@@ -40,9 +40,9 @@ void
 VarianObiHncRawToAttenuationImageFilter<TInputImage, TOutputImage>
 ::BeforeThreadedGenerateData()
 {
-  if( m_FileNames.size() != this->GetInput()->GetLargestPossibleRegion().GetSize()[2] )
+  if( m_FileNames.size() != 1 )
     {
-    itkGenericExceptionMacro(<< "Error, file names do not correspond to input");
+    itkGenericExceptionMacro(<< "Error, more than one norm file found.");
     }
 
   std::string path = itksys::SystemTools::GetFilenamePath(m_FileNames[0]);
