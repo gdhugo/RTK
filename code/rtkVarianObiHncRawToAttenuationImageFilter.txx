@@ -19,9 +19,7 @@
 #ifndef __rtkVarianObiHncRawToAttenuationImageFilter_txx
 #define __rtkVarianObiHncRawToAttenuationImageFilter_txx
 
-#include <itkImageFileWriter.h>
-#include <itksys/SystemTools.hxx>
-#include <itkRegularExpressionSeriesFileNames.h>
+#include <itkImageFileReader.h>
 
 #include "rtkMacro.h"
 
@@ -31,7 +29,7 @@ namespace rtk
 template <class TInputImage, class TOutputImage>
 VarianObiHncRawToAttenuationImageFilter<TInputImage, TOutputImage>
 ::VarianObiHncRawToAttenuationImageFilter() :
-  m_FloodProjectionsReader( HncImageSeries::New() )
+  m_FloodImageFileName( "norm.hnc" )
 {
 }
 
@@ -40,21 +38,14 @@ void
 VarianObiHncRawToAttenuationImageFilter<TInputImage, TOutputImage>
 ::BeforeThreadedGenerateData()
 {
-  if( m_FileNames.size() != 1 )
-    {
-    itkGenericExceptionMacro(<< "Error, more than one norm file found.");
-    }
-
-  std::string path = itksys::SystemTools::GetFilenamePath(m_FileNames[0]);
-  std::vector<std::string> pathComponents;
-  itksys::SystemTools::SplitPath(m_FileNames[0].c_str(), pathComponents);
-  std::string fileName = pathComponents.back();
-
   // Reference image (flood field)
-  FileNamesContainer floodFilenames;
-  floodFilenames.push_back( path + std::string("/norm.hnc") );
-  m_FloodProjectionsReader->SetFileNames( floodFilenames );
-  m_FloodProjectionsReader->Update();
+  typedef itk::ImageFileReader< InputImageType > HncImageType;
+  typename HncImageType::Pointer floodProjectionReader;
+
+  floodProjectionReader->SetFileName(m_FloodImageFileName );
+  floodProjectionReader->Update();
+  m_FloodImage = floodProjectionReader->GetOutput();
+  m_FloodImage->DisconnectPipeline();
 }
 
 template<class TInputImage, class TOutputImage>
@@ -67,7 +58,7 @@ VarianObiHncRawToAttenuationImageFilter<TInputImage, TOutputImage>
 
   floodRegion.SetSize(2,1);
   floodRegion.SetIndex(2,0);
-  itk::ImageRegionConstIterator<InputImageType> itFlood(m_FloodProjectionsReader->GetOutput(), floodRegion);
+  itk::ImageRegionConstIterator<InputImageType> itFlood(m_FloodImage, floodRegion);
 
   // Projection region
   OutputImageRegionType outputRegionSlice = outputRegionForThread;

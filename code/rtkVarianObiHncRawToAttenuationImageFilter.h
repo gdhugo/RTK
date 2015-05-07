@@ -20,8 +20,7 @@
 #define __rtkVarianObiHncRawToAttenuationImageFilter_h
 
 #include <itkImageToImageFilter.h>
-#include <itkImageSeriesReader.h>
-
+ 
 namespace rtk
 {
 
@@ -63,21 +62,6 @@ public:
   /** Runtime information support. */
   itkTypeMacro(VarianObiHncRawToAttenuationImageFilter, itk::ImageToImageFilter);
 
-  /** Set the vector of strings that contains the file names. Files
-   * are processed in sequential order. */
-  void SetFileNames(const FileNamesContainer &name)
-  {
-    if ( m_FileNames != name)
-      {
-      m_FileNames = name;
-      this->Modified();
-      }
-  }
-
-  const FileNamesContainer & GetFileNames() const
-  {
-    return m_FileNames;
-  }
 
 protected:
   VarianObiHncRawToAttenuationImageFilter();
@@ -93,11 +77,8 @@ private:
   VarianObiHncRawToAttenuationImageFilter(const Self&);
   void operator=(const Self&);
 
-  typedef itk::ImageSeriesReader< InputImageType > HncImageSeries;
-  typename HncImageSeries::Pointer m_FloodProjectionsReader;
-  
-  /** A list of filenames from which the input was read. */
-  FileNamesContainer m_FileNames;
+  std::string m_FloodImageFileName;
+  typename InputImageType::Pointer m_FloodImage;
 
 }; // end of class
 
