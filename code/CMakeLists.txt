@@ -10,6 +10,7 @@ ADD_LIBRARY(RTK
             rtkHisImageIO.cxx
             rtkHisImageIOFactory.cxx
             rtkElektaSynergyGeometryReader.cxx
+            rtkElektaXVI5GeometryXMLFile.cxx
             rtkDbf.cxx
             rtkHndImageIO.cxx
             rtkHndImageIOFactory.cxx
@@ -64,7 +65,7 @@ ENDIF(RTK_USE_OPENCL)
 #=========================================================
 # Cuda library stuff
 IF (RTK_USE_CUDA)
-  SET (RTK_LIBRARIES ${RTK_LIBRARIES} rtkcuda)
+  SET (RTK_LIBRARIES ${RTK_LIBRARIES} rtkcuda ITKCudaCommon ${CUDA_CUDA_LIBRARY})
   SET (rtkcuda_CUDA_FILES
        rtkCudaCropImageFilter.cu
        rtkCudaUtilities.cu
@@ -113,19 +114,19 @@ IF (RTK_USE_CUDA)
               rtkCudaFDKBackProjectionImageFilter.cxx
               rtkCudaFDKConeBeamReconstructionFilter.cxx
               rtkCudaBackProjectionImageFilter.cxx
-	      rtkCudaSplatImageFilter.cxx
-	      rtkCudaInterpolateImageFilter.cxx
-	      rtkCudaWarpImageFilter.cxx
-	      rtkCudaForwardWarpImageFilter.cxx
-	      rtkCudaRayCastBackProjectionImageFilter.cxx
-	      rtkCudaTotalVariationDenoisingBPDQImageFilter.cxx
-	      rtkCudaLastDimensionTVDenoisingImageFilter.cxx
-	      rtkCudaConstantVolumeSource.cxx
-	      rtkCudaConstantVolumeSeriesSource.cxx
+        rtkCudaSplatImageFilter.cxx
+        rtkCudaInterpolateImageFilter.cxx
+        rtkCudaWarpImageFilter.cxx
+        rtkCudaForwardWarpImageFilter.cxx
+        rtkCudaRayCastBackProjectionImageFilter.cxx
+        rtkCudaTotalVariationDenoisingBPDQImageFilter.cxx
+        rtkCudaLastDimensionTVDenoisingImageFilter.cxx
+        rtkCudaConstantVolumeSource.cxx
+        rtkCudaConstantVolumeSeriesSource.cxx
               rtkCudaConjugateGradientImageFilter_3f.cxx
               rtkCudaConjugateGradientImageFilter_4f.cxx
-	      rtkCudaAverageOutOfROIImageFilter.cxx
-	      ${rtkcuda_CUDA_WRAPPERS}
+        rtkCudaAverageOutOfROIImageFilter.cxx
+        ${rtkcuda_CUDA_WRAPPERS}
               ${rtkcuda_CUDA_FILES})
   SET_TARGET_PROPERTIES (rtkcuda PROPERTIES LINKER_LANGUAGE CXX)
   TARGET_LINK_LIBRARIES(rtkcuda ${CUDA_LIBRARIES} ${CUDA_cufft_LIBRARY} ${CUDA_cublas_LIBRARY} RTK ITKCudaCommon)

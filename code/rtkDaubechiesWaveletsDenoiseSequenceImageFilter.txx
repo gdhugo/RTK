@@ -16,36 +16,33 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkTotalVariationDenoiseSequenceImageFilter_txx
-#define __rtkTotalVariationDenoiseSequenceImageFilter_txx
+#ifndef __rtkDaubechiesWaveletsDenoiseSequenceImageFilter_txx
+#define __rtkDaubechiesWaveletsDenoiseSequenceImageFilter_txx
 
-#include "rtkTotalVariationDenoiseSequenceImageFilter.h"
+#include "rtkDaubechiesWaveletsDenoiseSequenceImageFilter.h"
 #include <itkImageFileWriter.h>
 
 namespace rtk
 {
 
 template< typename TImageSequence>
-TotalVariationDenoiseSequenceImageFilter< TImageSequence>
-::TotalVariationDenoiseSequenceImageFilter():
-  m_Gamma(1.),
-  m_NumberOfIterations(1)
+DaubechiesWaveletsDenoiseSequenceImageFilter< TImageSequence>
+::DaubechiesWaveletsDenoiseSequenceImageFilter():
+  m_Order(5),
+  m_Threshold(1),
+  m_NumberOfLevels(3)
 {
   // Create the filters
-  m_TVDenoisingFilter = TVDenoisingFilterType::New();
+  m_WaveletsDenoisingFilter = WaveletsDenoisingFilterType::New();
   m_ExtractFilter = ExtractFilterType::New();
   m_PasteFilter = PasteFilterType::New();
   m_CastFilter = CastFilterType::New();
   m_ConstantSource = ConstantImageSourceType::New();
 
   // Set permanent connections
-  m_TVDenoisingFilter->SetInput(m_ExtractFilter->GetOutput());
-  m_CastFilter->SetInput(m_TVDenoisingFilter->GetOutput());
+  m_WaveletsDenoisingFilter->SetInput(m_ExtractFilter->GetOutput());
+  m_CastFilter->SetInput(m_WaveletsDenoisingFilter->GetOutput());
   m_PasteFilter->SetSourceImage(m_CastFilter->GetOutput());
-
-  // Set default behavior to spatial regularization
-  for (unsigned int dim=0; dim < TImageSequence::ImageDimension-1; dim++)
-    m_DimensionsProcessed[dim]=true;
 
   // Set permanent parameters
   m_ExtractFilter->SetDirectionCollapseToIdentity();
@@ -56,7 +53,7 @@ TotalVariationDenoiseSequenceImageFilter< TImageSequence>
 
 template< typename TImageSequence>
 void
-TotalVariationDenoiseSequenceImageFilter< TImageSequence>
+DaubechiesWaveletsDenoiseSequenceImageFilter< TImageSequence>
 ::GenerateOutputInformation()
 {
   int Dimension = TImageSequence::ImageDimension;
@@ -70,9 +67,9 @@ TotalVariationDenoiseSequenceImageFilter< TImageSequence>
   m_PasteFilter->SetDestinationImage(m_ConstantSource->GetOutput());
 
   // Set runtime parameters
-  m_TVDenoisingFilter->SetGamma(m_Gamma);
-  m_TVDenoisingFilter->SetDimensionsProcessed(m_DimensionsProcessed);
-  m_TVDenoisingFilter->SetNumberOfIterations(m_NumberOfIterations);
+  m_WaveletsDenoisingFilter->SetOrder(m_Order);
+  m_WaveletsDenoisingFilter->SetThreshold(m_Threshold);
+  m_WaveletsDenoisingFilter->SetNumberOfLevels(m_NumberOfLevels);
 
   // Set extraction regions and indices
   m_ExtractAndPasteRegion = this->GetInput()->GetLargestPossibleRegion();
@@ -96,7 +93,7 @@ TotalVariationDenoiseSequenceImageFilter< TImageSequence>
 
 template< typename TImageSequence>
 void
-TotalVariationDenoiseSequenceImageFilter< TImageSequence>
+DaubechiesWaveletsDenoiseSequenceImageFilter< TImageSequence>
 ::GenerateInputRequestedRegion()
 {
   //Call the superclass' implementation of this method
@@ -109,24 +106,7 @@ TotalVariationDenoiseSequenceImageFilter< TImageSequence>
 
 template< typename TImageSequence>
 void
-TotalVariationDenoiseSequenceImageFilter< TImageSequence>
-::SetDimensionsProcessed(bool* arg)
-{
-  bool Modified=false;
-  for (int dim=0; dim<TImage::ImageDimension; dim++)
-    {
-    if (m_DimensionsProcessed[dim] != arg[dim])
-      {
-      m_DimensionsProcessed[dim] = arg[dim];
-      Modified = true;
-      }
-    }
-  if(Modified) this->Modified();
-}
-
-template< typename TImageSequence>
-void
-TotalVariationDenoiseSequenceImageFilter< TImageSequence>
+DaubechiesWaveletsDenoiseSequenceImageFilter< TImageSequence>
 ::GenerateData()
 {
   int Dimension = TImageSequence::ImageDimension;
@@ -148,7 +128,7 @@ TotalVariationDenoiseSequenceImageFilter< TImageSequence>
     m_ExtractFilter->SetExtractionRegion(m_ExtractAndPasteRegion);
     m_ExtractFilter->UpdateLargestPossibleRegion();
 
-    m_TVDenoisingFilter->Update();
+    m_WaveletsDenoisingFilter->Update();
 
     m_CastFilter->Update();
 
@@ -160,7 +140,7 @@ TotalVariationDenoiseSequenceImageFilter< TImageSequence>
   this->GraftOutput( m_PasteFilter->GetOutput() );
 
   m_ExtractFilter->GetOutput()->ReleaseData();
-  m_TVDenoisingFilter->GetOutput()->ReleaseData();
+  m_WaveletsDenoisingFilter->GetOutput()->ReleaseData();
   m_CastFilter->GetOutput()->ReleaseData();
 }
 
