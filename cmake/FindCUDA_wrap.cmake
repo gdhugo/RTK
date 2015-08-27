@@ -29,7 +29,8 @@ endif ()
 
 # GCS 2012-09-25 - Seems this is needed too
 if ("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
-  set (CUDA_CXX_FLAGS "${CUDA_CXX_FLAGS},-fPIC")
+	#  set (CUDA_CXX_FLAGS "${CUDA_CXX_FLAGS},-fPIC")
+  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -Xcompiler -fPIC")
 endif ()
 
 
