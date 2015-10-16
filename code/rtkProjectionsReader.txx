@@ -41,6 +41,7 @@
 
 // Elekta Synergy includes
 #include "rtkHisImageIOFactory.h"
+#include "rtkElektaSynergyRawLookupTableImageFilter.h"
 #include "rtkElektaSynergyLookupTableImageFilter.h"
 
 // ImagX includes
@@ -259,16 +260,23 @@ void ProjectionsReader<TOutputImage>
       // Elekta specific conversion of input raw data
       if( !strcmp(imageIO->GetNameOfClass(), "HisImageIO") )
         {
-        typedef rtk::ElektaSynergyRawLookupTableImageFilter<OutputImageDimension> ElektaRawType;
+        typedef rtk::ElektaSynergyRawLookupTableImageFilter< itk::Image<unsigned short, OutputImageDimension>,
+                                                             itk::Image<unsigned short, OutputImageDimension> > ElektaRawType;
         typename ElektaRawType::Pointer elekta = ElektaRawType::New();
         m_ElektaRawFilter = elekta;
 
         // Backward compatibility for default Elekta parameters
-        m_LowerBoundaryCropSize.Fill(4);
-        m_LowerBoundaryCropSize[2] = 0;
-        m_UpperBoundaryCropSize.Fill(4);
-        m_UpperBoundaryCropSize[2] = 0;
-        m_I0 = 65536;
+        OutputImageSizeType defaultCropSize;
+        defaultCropSize.Fill(0);
+        if(m_LowerBoundaryCropSize == defaultCropSize && m_UpperBoundaryCropSize == defaultCropSize)
+          {
+          m_LowerBoundaryCropSize.Fill(4);
+          m_LowerBoundaryCropSize[2] = 0;
+          m_UpperBoundaryCropSize.Fill(4);
+          m_UpperBoundaryCropSize[2] = 0;
+          }
+        if( m_I0 == itk::NumericTraits<double>::NonpositiveMin() )
+          m_I0 = 65536;
         }
 
       // Bin
@@ -486,7 +494,6 @@ void ProjectionsReader<TOutputImage>
       }
     else
       {
-      itk::ImageBase<OutputImageDimension> *nextInputBase;
       nextInputBase = dynamic_cast<itk::ImageBase<OutputImageDimension> *>(nextInput);
       assert(nextInputBase != NULL);
       PropagateI0(&nextInputBase);
@@ -544,7 +551,8 @@ void ProjectionsReader<TOutputImage>
 {
   if(m_ElektaRawFilter.GetPointer() != NULL)
     {
-    typedef rtk::ElektaSynergyRawLookupTableImageFilter<OutputImageDimension> ElektaRawType;
+    typedef rtk::ElektaSynergyRawLookupTableImageFilter< itk::Image<unsigned short, OutputImageDimension>,
+                                                         itk::Image<unsigned short, OutputImageDimension> > ElektaRawType;
     ElektaRawType *elektaRaw = dynamic_cast<ElektaRawType*>(m_ElektaRawFilter.GetPointer());
     assert(elektaRaw != NULL);
     typedef typename itk::Image<unsigned short, OutputImageDimension> InputImageType;
