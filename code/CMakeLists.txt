@@ -6,7 +6,7 @@ SET (RTK_LIBRARIES RTK lpsolve55)
 #=========================================================
 
 #=========================================================
-ADD_LIBRARY(RTK
+SET(RTK_LIBRARY_FILES
             rtkHisImageIO.cxx
             rtkHisImageIOFactory.cxx
             rtkElektaSynergyGeometryReader.cxx
@@ -35,7 +35,17 @@ ADD_LIBRARY(RTK
             rtkXRadImageIO.cxx
             rtkXRadImageIOFactory.cxx
             rtkIOFactories.cxx
-            rtkConvertEllipsoidToQuadricParametersFunction.cxx)
+            rtkConvertEllipsoidToQuadricParametersFunction.cxx
+            rtkDrawQuadricSpatialObject.cxx)
+IF(RTK_TIME_EACH_FILTER)
+    SET(RTK_LIBRARY_FILES
+            ${RTK_LIBRARY_FILES}
+            rtkGlobalTimer.cxx
+            rtkGlobalTimerProbesCollector.cxx
+            rtkWatcherForTimer.cxx
+            rtkTimeProbesCollectorBase.cxx)
+ENDIF()
+ADD_LIBRARY(RTK ${RTK_LIBRARY_FILES})
 
 TARGET_LINK_LIBRARIES(RTK ${ITK_LIBRARIES})
 TARGET_LINK_LIBRARIES(RTK lpsolve55)
@@ -88,6 +98,8 @@ IF (RTK_USE_CUDA)
        rtkCudaConjugateGradientImageFilter_3f.cu
        rtkCudaConjugateGradientImageFilter_4f.cu
        rtkCudaAverageOutOfROIImageFilter.cu
+       rtkCudaLaplacianImageFilter.cu
+       rtkCudaFirstOrderKernels.cu
        )
   # This is a fix for ITK4 to avoid too long cmd lines error
   # (http://www.itk.org/Bug/view.php?id=12198)
@@ -113,6 +125,7 @@ IF (RTK_USE_CUDA)
               rtkCudaCropImageFilter.cxx
               rtkCudaFDKBackProjectionImageFilter.cxx
               rtkCudaFDKConeBeamReconstructionFilter.cxx
+	      rtkCudaIterativeFDKConeBeamReconstructionFilter.cxx
               rtkCudaBackProjectionImageFilter.cxx
 	      rtkCudaSplatImageFilter.cxx
 	      rtkCudaInterpolateImageFilter.cxx
@@ -126,6 +139,7 @@ IF (RTK_USE_CUDA)
               rtkCudaConjugateGradientImageFilter_3f.cxx
               rtkCudaConjugateGradientImageFilter_4f.cxx
 	      rtkCudaAverageOutOfROIImageFilter.cxx
+	      rtkCudaLaplacianImageFilter.cxx
 	      ${rtkcuda_CUDA_WRAPPERS}
               ${rtkcuda_CUDA_FILES})
   SET_TARGET_PROPERTIES (rtkcuda PROPERTIES LINKER_LANGUAGE CXX)
@@ -141,7 +155,9 @@ IF(NOT RTK_INSTALL_NO_DEVELOPMENT)
   SET (RTK_INCLUDE_DIRS "${CMAKE_INSTALL_PREFIX}/${RTK_INSTALL_INCLUDE_DIR};${CMAKE_INSTALL_PREFIX}/${RTK_INSTALL_INCLUDE_DIR}/lpsolve")
   SET (RTK_LIBRARY_DIRS "${CMAKE_INSTALL_PREFIX}/${RTK_INSTALL_LIB_DIR}")
   CONFIGURE_FILE (${PROJECT_SOURCE_DIR}/cmake/RTKConfig.cmake.in ${RTK_BINARY_DIR}/CMakeFiles/RTKConfig.cmake @ONLY)
+  CONFIGURE_FILE (${PROJECT_SOURCE_DIR}/cmake/RTKConfigVersion.cmake.in ${RTK_BINARY_DIR}/CMakeFiles/RTKConfigVersion.cmake @ONLY)
   INSTALL(FILES ${RTK_BINARY_DIR}/CMakeFiles/RTKConfig.cmake
+                ${RTK_BINARY_DIR}/CMakeFiles/RTKConfigVersion.cmake
                 ${RTK_SOURCE_DIR}/cmake/UseRTK.cmake
           DESTINATION ${RTK_INSTALL_PACKAGE_DIR})
 
@@ -151,6 +167,12 @@ IF(NOT RTK_INSTALL_NO_DEVELOPMENT)
   INSTALL(FILES ${__files1} ${__files2} ${RTK_BINARY_DIR}/rtkConfiguration.h
     DESTINATION ${RTK_INSTALL_INCLUDE_DIR}
     COMPONENT Development)
+  IF(RTK_USE_CUDA)
+    FILE(GLOB __files3 "${PROJECT_SOURCE_DIR}/code/*.hcu")
+    INSTALL(FILES ${__files3}
+      DESTINATION ${RTK_INSTALL_INCLUDE_DIR}
+      COMPONENT Development)
+  ENDIF(RTK_USE_CUDA)
 ENDIF(NOT RTK_INSTALL_NO_DEVELOPMENT)
 
 IF(NOT RTK_INSTALL_NO_LIBRARIES)

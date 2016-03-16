@@ -25,6 +25,7 @@
 #include <itkExtractImageFilter.h>
 #include <itkPasteImageFilter.h>
 #include <itkCastImageFilter.h>
+#include <itkNearestNeighborInterpolateImageFunction.h>
 
 #ifdef RTK_USE_CUDA
   #include "rtkCudaWarpImageFilter.h"
@@ -54,7 +55,7 @@ namespace rtk
    *
    * node [shape=box];
    * Extract [label="itk::ExtractImageFilter (for images)" URL="\ref itk::ExtractImageFilter"];
-   * CyclicDeformation [label="rtk::CyclicDeformationImageFilter (for MVFs)" URL="\ref rtk::CyclicDeformationImageFilter"];
+   * CyclicDeformation [label="rtk::CyclicDeformationImageFilter (for DVFs)" URL="\ref rtk::CyclicDeformationImageFilter"];
    * Warp [ label="itk::WarpImageFilter" URL="\ref itk::WarpImageFilter"];
    * Cast [ label="itk::CastImageFilter" URL="\ref itk::CastImageFilter"];
    * Paste [ label="itk::PasteImageFilter" URL="\ref itk::PasteImageFilter"];
@@ -67,10 +68,11 @@ namespace rtk
    * Extract -> Warp;
    * CyclicDeformation -> Warp;
    * Warp -> Cast;
-   * Cast -> BeforePaste [arrowhead=none];
+   * Cast -> Paste;
+   * ConstantSource -> BeforePaste [arrowhead=none];
    * BeforePaste -> Paste;
    * Paste -> AfterPaste [arrowhead=none];
-   * AfterPaste -> BeforePaste [style=dashed];
+   * AfterPaste -> BeforePaste [style=dashed, constraint=false];
    * AfterPaste -> Output [style=dashed];
    * }
    * \enddot
@@ -119,20 +121,25 @@ public:
     itkSetMacro(PhaseShift, float)
     itkGetMacro(PhaseShift, float)
 
+    /** Information for the CUDA warp filter, to avoid using RTTI */
+    itkSetMacro(UseNearestNeighborInterpolationInWarping, bool)
+    itkGetMacro(UseNearestNeighborInterpolationInWarping, bool)
+
     /** Typedefs of internal filters */
 #ifdef RTK_USE_CUDA
-    typedef rtk::CudaWarpImageFilter                                CudaWarpFilterType;
-    typedef rtk::CudaForwardWarpImageFilter                         CudaForwardWarpFilterType;
+    typedef rtk::CudaWarpImageFilter                                          CudaWarpFilterType;
+    typedef rtk::CudaForwardWarpImageFilter                                   CudaForwardWarpFilterType;
 #endif
-    typedef itk::WarpImageFilter<TImage, TImage, TMVFImage>         WarpFilterType;
-    typedef rtk::ForwardWarpImageFilter<TImage, TImage, TMVFImage>  ForwardWarpFilterType;
+    typedef itk::WarpImageFilter<TImage, TImage, TMVFImage>                   WarpFilterType;
+    typedef rtk::ForwardWarpImageFilter<TImage, TImage, TMVFImage>            ForwardWarpFilterType;
 
-    typedef itk::LinearInterpolateImageFunction<TImage, double >    InterpolatorType;
-    typedef itk::ExtractImageFilter<TImageSequence, TImage>         ExtractFilterType;
-    typedef rtk::CyclicDeformationImageFilter<TMVFImage>            MVFInterpolatorType;
-    typedef itk::PasteImageFilter<TImageSequence,TImageSequence>    PasteFilterType;
-    typedef itk::CastImageFilter<TImage, TImageSequence>            CastFilterType;
-    typedef rtk::ConstantImageSource<TImageSequence>                ConstantImageSourceType;
+    typedef itk::LinearInterpolateImageFunction<TImage, double >              LinearInterpolatorType;
+    typedef itk::NearestNeighborInterpolateImageFunction<TImage, double >     NearestNeighborInterpolatorType;
+    typedef itk::ExtractImageFilter<TImageSequence, TImage>                   ExtractFilterType;
+    typedef rtk::CyclicDeformationImageFilter<TMVFImage>                      MVFInterpolatorType;
+    typedef itk::PasteImageFilter<TImageSequence,TImageSequence>              PasteFilterType;
+    typedef itk::CastImageFilter<TImage, TImageSequence>                      CastFilterType;
+    typedef rtk::ConstantImageSource<TImageSequence>                          ConstantImageSourceType;
 
 protected:
     WarpSequenceImageFilter();
@@ -166,6 +173,8 @@ protected:
     void GenerateOutputInformation();
     void GenerateInputRequestedRegion();
 
+    bool m_UseNearestNeighborInterpolationInWarping; //Default is false, linear interpolation is used instead
+
 private:
     WarpSequenceImageFilter(const Self &); //purposely not implemented
     void operator=(const Self &);  //purposely not implemented
@@ -174,7 +183,7 @@ private:
 
 
 #ifndef ITK_MANUAL_INSTANTIATION
-#include "rtkWarpSequenceImageFilter.txx"
+#include "rtkWarpSequenceImageFilter.hxx"
 #endif
 
 #endif

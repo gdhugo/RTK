@@ -73,6 +73,7 @@ protected:
     typename TROI::Pointer GetROI();
 
     virtual void GenerateOutputInformation();
+    virtual void GenerateInputRequestedRegion();
 
     /** Does the real work. */
     virtual void ThreadedGenerateData(const typename TInputImage::RegionType& outputRegionForThread, itk::ThreadIdType itkNotUsed(threadId));
@@ -93,7 +94,7 @@ private:
 
 
 #ifndef ITK_MANUAL_INSTANTIATION
-#include "rtkAverageOutOfROIImageFilter.txx"
+#include "rtkAverageOutOfROIImageFilter.hxx"
 #endif
 
 #endif

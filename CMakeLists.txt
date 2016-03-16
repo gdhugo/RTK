@@ -33,7 +33,7 @@ ENDIF(BUILD_TESTING)
 
 #=========================================================
 SET(RTK_VERSION_MAJOR "1")
-SET(RTK_VERSION_MINOR "1")
+SET(RTK_VERSION_MINOR "2")
 SET(RTK_VERSION_PATCH "0")
 
 #=========================================================
@@ -210,8 +210,14 @@ ADD_SUBDIRECTORY(code)
 # Generate RTKConfig.cmake for the build tree.
 SET (RTK_USE_FILE "${RTK_SOURCE_DIR}/cmake/UseRTK.cmake")
 SET (RTK_LIBRARY_DIRS ${RTK_LIBRARY_PATH})
-CONFIGURE_FILE (cmake/RTKConfig.cmake.in RTKConfig.cmake @ONLY)
+CONFIGURE_FILE(cmake/RTKConfig.cmake.in RTKConfig.cmake @ONLY)
+CONFIGURE_FILE(cmake/RTKConfigVersion.cmake.in RTKConfigVersion.cmake @ONLY)
 #=========================================================
+
+option(RTK_TIME_EACH_FILTER "Time each RTK filter in a global object and report times in RTK applications" OFF)
+IF(ITK_VERSION LESS "4.6")
+    SET(RTK_TIME_EACH_FILTER OFF) 
+ENDIF()
 
 option(BUILD_APPLICATIONS "Build RTK applications" ON)
 IF(BUILD_APPLICATIONS)

@@ -75,12 +75,23 @@ SetConstantImageSourceFromGgo(typename TConstantImageSourceType::Pointer source,
   else
     imageDirection.SetIdentity();
 
-
   source->SetOrigin( imageOrigin );
   source->SetSpacing( imageSpacing );
   source->SetDirection( imageDirection );
   source->SetSize( imageDimension );
   source->SetConstant( 0. );
+
+  // Copy output image information from an existing file, if requested
+  // Overwrites parameters given in command line, if any
+  if (args_info.like_given)
+    {
+    typedef itk::ImageFileReader<  ImageType > LikeReaderType;
+    typename LikeReaderType::Pointer likeReader = LikeReaderType::New();
+    likeReader->SetFileName( args_info.like_arg );
+    TRY_AND_EXIT_ON_ITK_EXCEPTION( likeReader->UpdateOutputInformation() );
+    source->SetInformationFromImage(likeReader->GetOutput());
+    }
+
   TRY_AND_EXIT_ON_ITK_EXCEPTION( source->UpdateOutputInformation() );
 }
 
@@ -172,6 +183,10 @@ SetProjectionsReaderFromGgo(typename TProjectionsReaderType::Pointer reader, con
   // I0
   if(args_info.i0_given)
     reader->SetI0(args_info.i0_arg);
+
+  // Line integral flag
+  if(args_info.nolineint_flag)
+    reader->ComputeLineIntegralOff();
 
   // Water precorrection
   if(args_info.wpc_given)

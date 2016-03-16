@@ -19,11 +19,9 @@
 #ifndef __rtkTotalVariationDenoisingBPDQImageFilter_h
 #define __rtkTotalVariationDenoisingBPDQImageFilter_h
 
-
 #include "rtkForwardDifferenceGradientImageFilter.h"
 #include "rtkBackwardDifferenceDivergenceImageFilter.h"
 #include "rtkMagnitudeThresholdImageFilter.h"
-#include "rtkMacro.h"
 
 #include <itkCastImageFilter.h>
 #include <itkSubtractImageFilter.h>
@@ -155,7 +153,7 @@ public:
 
 protected:
   TotalVariationDenoisingBPDQImageFilter();
-  virtual ~TotalVariationDenoisingBPDQImageFilter();
+  ~TotalVariationDenoisingBPDQImageFilter(){}
 
   virtual void GenerateData();
 
@@ -189,7 +187,7 @@ private:
 } // end namespace itk
 
 #ifndef ITK_MANUAL_INSTANTIATION
-#include "rtkTotalVariationDenoisingBPDQImageFilter.txx"
+#include "rtkTotalVariationDenoisingBPDQImageFilter.hxx"
 #endif
 
 #endif //__rtkTotalVariationDenoisingBPDQImageFilter__

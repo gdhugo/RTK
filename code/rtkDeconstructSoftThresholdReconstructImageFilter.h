@@ -32,7 +32,7 @@ namespace rtk {
 
 /**
  * \class DeconstructSoftThresholdReconstructImageFilter
- * \brief Deconstructs an image, soft thresholds it wavelets coefficients,
+ * \brief Deconstructs an image, soft thresholds its wavelets coefficients,
  * then reconstructs
  *
  * This filter is inspired from Dan Mueller's GIFT package
@@ -116,7 +116,7 @@ private:
 
 //Include CXX
 #ifndef rtk_MANUAL_INSTANTIATION
-#include "rtkDeconstructSoftThresholdReconstructImageFilter.txx"
+#include "rtkDeconstructSoftThresholdReconstructImageFilter.hxx"
 #endif
 
 #endif
