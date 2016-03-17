@@ -92,7 +92,19 @@ VarianObiHncRawToAttenuationImageFilter<TInputImage, TOutputImage>
     while( !itFlood.IsAtEnd() )
       {
       // The reference has been exactly acquired at the same position
-      itOut.Set( -log( (double)itIn.Get() / (double)itFlood.Get() ) );
+      if( !itIn.Get() )
+      {
+        itOut.Set(0.0F);
+      }
+      else
+      {
+        double val = vcl_log( static_cast<double>(itFlood.Get()) ) - vcl_log( static_cast<double>(itIn.Get()) );
+        if(val > 0)
+          itOut.Set(val);
+          //itOut.Set(val * 10000.0F); JLu code applies a scaling factor of 10000.0F. Not sure why.
+        else
+          itOut.Set(0.0F);
+      }
       ++itIn;
       ++itOut;
       ++itFlood;

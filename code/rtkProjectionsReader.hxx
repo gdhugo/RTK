@@ -249,7 +249,12 @@ void ProjectionsReader<TOutputImage>
       typedef rtk::VarianObiHncRawToAttenuationImageFilter<InputImageType, OutputImageType> RawFilterType;
       typename RawFilterType::Pointer rawFilter = RawFilterType::New();
       m_RawToAttenuationFilter = rawFilter;
-      }  
+
+      // Or just cast to OutputImageType
+      typedef itk::CastImageFilter<InputImageType, OutputImageType> CastFilterType;
+      typename CastFilterType::Pointer castFilter = CastFilterType::New();
+      m_RawCastFilter = castFilter;
+      }
     else if( !strcmp(imageIO->GetNameOfClass(), "HisImageIO") ||
              !strcmp(imageIO->GetNameOfClass(), "DCMImagXImageIO") ||
              !strcmp(imageIO->GetNameOfClass(), "ImagXImageIO") ||
@@ -556,6 +561,7 @@ void ProjectionsReader<TOutputImage>
   if(edf)
     edf->SetFileNames( this->GetFileNames() );
 
+  // HNC raw to attenuation converter needs filenames for path to flood field
   typedef rtk::VarianObiHncRawToAttenuationImageFilter<TInputImage, OutputImageType> HncRawFilterType;
   HncRawFilterType *hnc = dynamic_cast<HncRawFilterType*>( m_RawToAttenuationFilter.GetPointer() );
   if(hnc)
