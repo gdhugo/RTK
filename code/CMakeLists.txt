@@ -14,13 +14,10 @@ set(RTK_LIBRARY_FILES
             rtkDbf.cxx
             rtkHndImageIO.cxx
             rtkHndImageIOFactory.cxx
-<<<<<<< HEAD
             rtkHncImageIO.cxx
             rtkHncImageIOFactory.cxx
-=======
             rtkXimImageIO.cxx
             rtkXimImageIOFactory.cxx
->>>>>>> upstream/master
             rtkVarianObiXMLFileReader.cxx
             rtkVarianObiGeometryReader.cxx
             rtkVarianProBeamXMLFileReader.cxx
@@ -57,21 +54,11 @@ if(RTK_TIME_EACH_FILTER)
             rtkGlobalTimerProbesCollector.cxx
             rtkWatcherForTimer.cxx
             rtkTimeProbesCollectorBase.cxx)
-<<<<<<< HEAD
-ENDIF()
-ADD_LIBRARY(RTK ${RTK_LIBRARY_FILES})
-
-TARGET_LINK_LIBRARIES(RTK ${ITK_LIBRARIES})
-TARGET_LINK_LIBRARIES(RTK lpsolve55)
-TARGET_LINK_LIBRARIES(RTK ${BZIP2_LIBRARIES})
-#=========================================================
-=======
 endif()
 add_library(RTK ${RTK_LIBRARY_FILES})
->>>>>>> upstream/master
-
 target_link_libraries(RTK ${ITK_LIBRARIES})
 target_link_libraries(RTK lpsolve55)
+target_link_libraries(RTK ${BZIP2_LIBRARIES})
 #=========================================================
 
 #=========================================================

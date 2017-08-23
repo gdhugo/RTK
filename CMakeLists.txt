@@ -99,14 +99,6 @@ else()
 endif()
 option(RTK_USE_CUDA "Use CUDA for RTK" ${RTK_USE_CUDA_DEFAULT})
 
-<<<<<<< HEAD
-IF(RTK_USE_CUDA)
-  IF(NOT CUDA_FOUND)
-    FIND_PACKAGE(CUDA_wrap REQUIRED)
-  ENDIF()
-  INCLUDE_DIRECTORIES(${CUDA_INCLUDE_DIRS})
-ENDIF()
-
 # Find BZIP2 (required for Varian HNC)
 FIND_PACKAGE(BZip2)
 IF(BZIP2_FOUND)
@@ -114,7 +106,7 @@ IF(BZIP2_FOUND)
 ELSE(BZIP2_FOUND)
   MESSAGE(FATAL_ERROR "Cannot build without bzip2.")
 ENDIF(BZIP2_FOUND)
-=======
+
 if(RTK_USE_CUDA)
   if(NOT CUDA_FOUND)
     find_package(CUDA_wrap REQUIRED)
@@ -122,7 +114,7 @@ if(RTK_USE_CUDA)
   include_directories(${CUDA_INCLUDE_DIRS})
   set(RTK_CUDA_PROJECTIONS_SLAB_SIZE "16" CACHE STRING "Number of projections processed simultaneously in CUDA forward and back projections")
 endif()
->>>>>>> upstream/master
+
 #=========================================================
 
 #=========================================================

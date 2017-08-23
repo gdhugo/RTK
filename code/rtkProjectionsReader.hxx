@@ -275,7 +275,7 @@ void ProjectionsReader<TOutputImage>
       typename CastFilterType::Pointer castFilter = CastFilterType::New();
       m_RawCastFilter = castFilter;
       }
-<<<<<<< HEAD
+        
     else if( !strcmp(imageIO->GetNameOfClass(), "HncImageIO") )
       {
       /////////// Varian OBI HNC
@@ -322,9 +322,6 @@ void ProjectionsReader<TOutputImage>
              !strcmp(imageIO->GetNameOfClass(), "ImagXImageIO") ||
              !strcmp(imageIO->GetNameOfClass(), "TIFFImageIO") ||
              imageIO->GetComponentType() == itk::ImageIOBase::USHORT )
-=======
-    else if( imageIO->GetComponentType() == itk::ImageIOBase::USHORT )
->>>>>>> upstream/master
       {
       /////////// Ora, Elekta synergy, IBA / iMagX, unsigned short
       typedef unsigned short                                     InputPixelType;
@@ -460,7 +457,6 @@ void ProjectionsReader<TOutputImage>
     }
 
   // Parameter propagation
-<<<<<<< HEAD
   if( !strcmp(imageIO->GetNameOfClass(), "XRadImageIO") ||
       !strcmp(imageIO->GetNameOfClass(), "HisImageIO") ||
       !strcmp(imageIO->GetNameOfClass(), "DCMImagXImageIO") ||
@@ -468,9 +464,6 @@ void ProjectionsReader<TOutputImage>
       !strcmp(imageIO->GetNameOfClass(), "TIFFImageIO") ||
       !strcmp(imageIO->GetNameOfClass(), "HncImageIO") ||
       imageIO->GetComponentType() == itk::ImageIOBase::USHORT )
-=======
-  if( imageIO->GetComponentType() == itk::ImageIOBase::USHORT )
->>>>>>> upstream/master
     PropagateParametersToMiniPipeline< itk::Image<unsigned short, OutputImageDimension> >();
   else if( !strcmp(imageIO->GetNameOfClass(), "HndImageIO") ||
            !strcmp(imageIO->GetNameOfClass(), "XimImageIO"))
@@ -718,20 +711,11 @@ void ProjectionsReader<TOutputImage>
     if(edf)
       edf->SetFileNames( this->GetFileNames() );
 
-<<<<<<< HEAD
-  // HNC raw to attenuation converter needs filenames for path to flood field
-  typedef rtk::VarianObiHncRawToAttenuationImageFilter<TInputImage, OutputImageType> HncRawFilterType;
-  HncRawFilterType *hnc = dynamic_cast<HncRawFilterType*>( m_RawToAttenuationFilter.GetPointer() );
-  if(hnc)
-    hnc->SetProjectionFileName( this->GetFileNames()[0] );
-
-  // Water coefficients
-  if(m_WaterPrecorrectionCoefficients.size() != 0)
-    {
-    m_WaterPrecorrectionFilter->SetCoefficients(m_WaterPrecorrectionCoefficients);
-    m_WaterPrecorrectionFilter->SetInput(output);
-    output = m_WaterPrecorrectionFilter->GetOutput();
-=======
+    // HNC raw to attenuation converter needs filenames for path to flood field
+    typedef rtk::VarianObiHncRawToAttenuationImageFilter<TInputImage, OutputImageType> HncRawFilterType;
+    HncRawFilterType *hnc = dynamic_cast<HncRawFilterType*>( m_RawToAttenuationFilter.GetPointer() );
+    if(hnc)
+      hnc->SetProjectionFileName( this->GetFileNames()[0] );
     // Water coefficients
     if(m_WaterPrecorrectionCoefficients.size() != 0)
       {
@@ -739,7 +723,6 @@ void ProjectionsReader<TOutputImage>
       m_WaterPrecorrectionFilter->SetInput(output);
       output = m_WaterPrecorrectionFilter->GetOutput();
       }
->>>>>>> upstream/master
     }
   // Streaming image filter
   m_StreamingFilter->SetInput( output );

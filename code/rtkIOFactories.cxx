@@ -56,11 +56,8 @@ void RegisterIOFactories()
     itk::GDCMImageIOFactory::UnRegisterFactory(*it);
     }
   rtk::HndImageIOFactory::RegisterOneFactory();
-<<<<<<< HEAD
   rtk::HncImageIOFactory::RegisterOneFactory();
-=======
   rtk::XimImageIOFactory::RegisterOneFactory();
->>>>>>> upstream/master
   rtk::HisImageIOFactory::RegisterOneFactory();
   rtk::ImagXImageIOFactory::RegisterOneFactory();
   rtk::DCMImagXImageIOFactory::RegisterOneFactory();
