@@ -74,7 +74,7 @@ int main(int argc, char * argv[])
     rtk::SetConstantImageSourceFromGgo<ConstantImageSourceType, args_info_rtkregularizedconjugategradient>(constantImageSource, args_info);
     inputFilter = constantImageSource;
     }
-  inputFilter->Update();
+  TRY_AND_EXIT_ON_ITK_EXCEPTION( inputFilter->Update() )
   inputFilter->ReleaseDataFlagOn();
 
   // Read weights if given, otherwise default to weights all equal to one
@@ -92,10 +92,20 @@ int main(int argc, char * argv[])
     ConstantWeightsSourceType::Pointer constantWeightsSource = ConstantWeightsSourceType::New();
 
     // Set the weights to be like the projections
-    reader->UpdateOutputInformation();
+    TRY_AND_EXIT_ON_ITK_EXCEPTION( reader->UpdateOutputInformation() )
     constantWeightsSource->SetInformationFromImage(reader->GetOutput());
     constantWeightsSource->SetConstant(1.0);
     weightsSource = constantWeightsSource;
+    }
+
+  // Read Support Mask if given
+  itk::ImageSource< OutputImageType >::Pointer supportmaskSource;
+  if(args_info.mask_given)
+    {
+    typedef itk::ImageFileReader<  OutputImageType > MaskReaderType;
+    MaskReaderType::Pointer supportmaskReader = MaskReaderType::New();
+    supportmaskReader->SetFileName( args_info.mask_arg );
+    supportmaskSource = supportmaskReader;
     }
 
   // Set the forward and back projection filters to be used
@@ -106,10 +116,15 @@ int main(int argc, char * argv[])
   regularizedConjugateGradient->SetInputVolume(inputFilter->GetOutput() );
   regularizedConjugateGradient->SetInputProjectionStack(reader->GetOutput());
   regularizedConjugateGradient->SetInputWeights( weightsSource->GetOutput());
-  regularizedConjugateGradient->SetPreconditioned(args_info.preconditioned_flag);
   regularizedConjugateGradient->SetGeometry( geometryReader->GetOutputObject() );
   regularizedConjugateGradient->SetMainLoop_iterations( args_info.niter_arg );
   regularizedConjugateGradient->SetCudaConjugateGradient(!args_info.nocudacg_flag);
+  regularizedConjugateGradient->SetDisableDisplacedDetectorFilter(args_info.nodisplaced_flag);
+  if(args_info.mask_given)
+    {
+    regularizedConjugateGradient->SetSupportMask(supportmaskSource->GetOutput() );
+    }
+  regularizedConjugateGradient->SetIterationCosts(args_info.costs_flag);
 
   // Positivity
   if (args_info.nopositivity_flag)
@@ -146,6 +161,15 @@ int main(int argc, char * argv[])
   else
     regularizedConjugateGradient->SetPerformWaveletsSpatialDenoising(false);
 
+  // Sparsity in image domain
+  if (args_info.soft_given)
+    {
+    regularizedConjugateGradient->SetSoftThresholdOnImage(args_info.soft_arg);
+    regularizedConjugateGradient->SetPerformSoftThresholdOnImage(true);
+    }
+  else
+    regularizedConjugateGradient->SetSoftThresholdOnImage(false);
+
   itk::TimeProbe readerProbe;
   if(args_info.time_flag)
     {
@@ -153,7 +177,7 @@ int main(int argc, char * argv[])
     readerProbe.Start();
     }
 
-  TRY_AND_EXIT_ON_ITK_EXCEPTION( regularizedConjugateGradient->Update() );
+  TRY_AND_EXIT_ON_ITK_EXCEPTION( regularizedConjugateGradient->Update() )
 
   if(args_info.time_flag)
     {
@@ -167,7 +191,7 @@ int main(int argc, char * argv[])
   WriterType::Pointer writer = WriterType::New();
   writer->SetFileName( args_info.output_arg );
   writer->SetInput( regularizedConjugateGradient->GetOutput() );
-  TRY_AND_EXIT_ON_ITK_EXCEPTION( writer->Update() );
+  TRY_AND_EXIT_ON_ITK_EXCEPTION( writer->Update() )
 
   return EXIT_SUCCESS;
 }

@@ -30,20 +30,24 @@ int main(int argc, char * argv[])
   const unsigned int Dimension = 3;
   typedef itk::Image< OutputPixelType, Dimension > OutputImageType;
 
-  // Generate file names of projections
-  itk::RegularExpressionSeriesFileNames::Pointer names = itk::RegularExpressionSeriesFileNames::New();
-  names->SetDirectory(args_info.path_arg);
-  names->SetNumericSort(args_info.nsort_flag);
-  names->SetRegularExpression(args_info.regexp_arg);
-  names->SetSubMatch(args_info.submatch_arg);
-
   // Create geometry reader
   rtk::ImagXGeometryReader<OutputImageType>::Pointer imagxReader = rtk::ImagXGeometryReader<OutputImageType>::New();
-  imagxReader->SetProjectionsFileNames(names->GetFileNames());
-  imagxReader->SetCalibrationXMLFileName(args_info.calibration_arg);
-  imagxReader->SetRoomXMLFileName(args_info.room_setup_arg);
+  imagxReader->SetProjectionsFileNames( rtk::GetProjectionsFileNamesFromGgo(args_info) );
+  if (args_info.dicomcalibration_flag)
+    {
+    imagxReader->SetReadCalibrationFromProjections(true);
+    }
+  else
+    {
+    if (! (args_info.calibration_given)&&(args_info.room_setup_given))
+        itkGenericExceptionMacro("Calibration and room setup information required, either from projection's DICOM information or from external xml files");
+
+    imagxReader->SetReadCalibrationFromProjections(false);
+    imagxReader->SetCalibrationXMLFileName(args_info.calibration_arg);
+    imagxReader->SetRoomXMLFileName(args_info.room_setup_arg);
+    }
   imagxReader->SetDetectorOffset(args_info.offset_arg);
-  TRY_AND_EXIT_ON_ITK_EXCEPTION( imagxReader->UpdateOutputData() );
+  TRY_AND_EXIT_ON_ITK_EXCEPTION( imagxReader->UpdateOutputData() )
 
   // Write
   rtk::ThreeDCircularProjectionGeometryXMLFileWriter::Pointer xmlWriter = rtk::ThreeDCircularProjectionGeometryXMLFileWriter::New();

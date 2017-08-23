@@ -16,12 +16,11 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkThreeDCircularProjectionGeometry_h
-#define __rtkThreeDCircularProjectionGeometry_h
+#ifndef rtkThreeDCircularProjectionGeometry_h
+#define rtkThreeDCircularProjectionGeometry_h
 
 #include "rtkWin32Header.h"
 #include "rtkProjectionGeometry.h"
-#include "rtkMacro.h"
 
 namespace rtk
 {
@@ -45,6 +44,7 @@ namespace rtk
  *
  * \ingroup ProjectionGeometry
  */
+
 class RTK_EXPORT ThreeDCircularProjectionGeometry : public ProjectionGeometry<3>
 {
 public:
@@ -55,8 +55,11 @@ public:
 
   typedef itk::Vector<double, 3>           VectorType;
   typedef itk::Vector<double, 4>           HomogeneousVectorType;
-  typedef itk::Matrix< double, 3, 3 >      TwoDHomogeneousMatrixType;
-  typedef itk::Matrix< double, 4, 4 >      ThreeDHomogeneousMatrixType;
+  typedef itk::Matrix<double, 3, 3 >       TwoDHomogeneousMatrixType;
+  typedef itk::Matrix<double, 4, 4 >       ThreeDHomogeneousMatrixType;
+  typedef itk::Point<double, 3>            PointType;
+  typedef itk::Matrix<double, 3, 3>        Matrix3x3Type;
+  typedef Superclass::MatrixType           HomogeneousProjectionMatrixType;
 
   /** Method for creation through the object factory. */
   itkNewMacro( Self );
@@ -76,8 +79,27 @@ public:
                                       const double outOfPlaneAngle=0., const double inPlaneAngle=0.,
                                       const double sourceOffsetX=0., const double sourceOffsetY=0.);
 
+  /**
+   * @brief Add a REG23-based geometry set to the RTK projections list.
+   * @param sourcePosition absolute position of the point source S in WCS
+   * @param detectorPosition absolute position of the detector origin R in WCS
+   * @param detectorRowVector absolute direction vector indicating the
+   * orientation of the detector's rows r (sometimes referred to as v1)
+   * @param detectorColumnVector absolute direction vector indicating the
+   * orientation of the detector's columns c (sometimes referred to as v2)
+   * @return TRUE if the projection could be added to the RTK projections list
+   */
+  bool AddProjection(const PointType &sourcePosition,
+                     const PointType &detectorPosition,
+                     const VectorType &detectorRowVector,
+                     const VectorType &detectorColumnVector);
+
+
+  /** Add projection from a projection matrix. */
+  bool AddProjection(const HomogeneousProjectionMatrixType &pMat);
+
   /** Empty the geometry object. */
-  virtual void Clear() ITK_OVERRIDE;
+  void Clear() ITK_OVERRIDE;
 
   /** Get the vector of geometry parameters (one per projection). Angles are
    * in radians.*/
@@ -152,7 +174,7 @@ public:
                                       double transZ);
 
   /** Compute the magnification matrix from 3D to 2D given a source to detector
-   * and to detector distance. */
+   * and to isocenter distance. */
   static Superclass::MatrixType ComputeProjectionMagnificationMatrix(double sdd,
                                                                      double sid);
 
@@ -171,9 +193,37 @@ public:
     return this->m_MagnificationMatrices;
   }
 
+  /** Get the vector containing the collimation jaw parameters. */
+  const std::vector<double> &GetCollimationUInf() const {
+    return this->m_CollimationUInf;
+  }
+  const std::vector<double> &GetCollimationUSup() const {
+    return this->m_CollimationUSup;
+  }
+  const std::vector<double> &GetCollimationVInf() const {
+    return this->m_CollimationVInf;
+  }
+  const std::vector<double> &GetCollimationVSup() const {
+    return this->m_CollimationVSup;
+  }
+
+  /** Set the collimation of the latest added projection (to be called after
+   * AddProjection). */
+  void SetCollimationOfLastProjection(const double uinf,
+                                      const double usup,
+                                      const double vinf,
+                                      const double vsup);
+
   /** Get the source position for the ith projection in the fixed reference
    * system and in homogeneous coordinates. */
   const HomogeneousVectorType GetSourcePosition(const unsigned int i) const;
+
+  /** Compute the ith matrix to convert projection coordinates to coordinates
+   * in the detector coordinate system (u,v,u^v). Note that the matrix is square but the
+   * third element of the projection coordinates is ignored because projection
+   * coordinates are 2D. This is meant to manipulate more easily stack of
+   * projection images. */
+  const ThreeDHomogeneousMatrixType GetProjectionCoordinatesToDetectorSystemMatrix(const unsigned int i) const;
 
   /** Compute the ith matrix to convert projection coordinates to coordinates
    * in the fixed coordinate system. Note that the matrix is square but the
@@ -195,9 +245,14 @@ public:
   double ToUntiltedCoordinateAtIsocenter(const unsigned int noProj,
                                          const double tiltedCoord) const;
 
+  /** Accessor for the radius of curved detector. The default is 0 and it means
+   * a flat detector. */
+  itkGetMacro(RadiusCylindricalDetector, double)
+  itkSetMacro(RadiusCylindricalDetector, double)
+
 protected:
-  ThreeDCircularProjectionGeometry() {};
-  virtual ~ThreeDCircularProjectionGeometry() {};
+  ThreeDCircularProjectionGeometry();
+  ~ThreeDCircularProjectionGeometry() {}
 
   virtual void AddProjectionTranslationMatrix(const TwoDHomogeneousMatrixType &m){
     this->m_ProjectionTranslationMatrices.push_back(m);
@@ -216,6 +271,48 @@ protected:
     this->Modified();
   }
 
+  /** Verify that the specified Euler angles in ZXY result in a rotation matrix
+   * which corresponds to the specified detector orientation. Rationale for this
+   * utility method is that in some situations numerical instabilities (e.g. if
+   * gantry=+90deg,in-plane=-90deg or vice versa, "invalid" angles may be
+   * computed using the standard ITK Euler transform) may occur.
+   * @param outOfPlaneAngleRAD out-of-plane angle of the detector in radians
+   * @param gantryAngleRAD gantry angle of the detector in radians
+   * @param inPlaneAngleRAD in-plane angle of the detector in radians
+   * @param referenceMatrix reference matrix which reflects detector orientation
+   * in WCS
+   * @return TRUE if the angles correspond the implicitly specified final
+   * rotation matrix; if FALSE is returned, the angles should be fixed
+   * (@see FixAngles())
+   * @warning {Internally, the matrix check is performed with a tolerance level
+   * of 1e-6!}
+   */
+  bool VerifyAngles(const double outOfPlaneAngleRAD, const double gantryAngleRAD,
+                    const double inPlaneAngleRAD,
+                    const Matrix3x3Type &referenceMatrix) const;
+
+  /** Try to fix Euler angles, which were found incorrect, to match the specified
+   * reference matrix.
+   * @param [out] outOfPlaneAngleRAD out-of-plane angle of the detector in radians;
+   * if this method returns TRUE, this angle can be safely considered
+   * @param [out] gantryAngleRAD gantry angle of the detector in radians;
+   * if this method returns TRUE, this angle can be safely considered
+   * @param [out] inPlaneAngleRAD in-plane angle of the detector in radians;
+   * if this method returns TRUE, this angle can be safely considered
+   * @param referenceMatrix reference matrix which reflects detector orientation
+   * in WCS
+   * @return TRUE if the angles were fixed and can be safely considered;
+   * if FALSE is returned, the method could not find angles which generate the
+   * desired matrix with respect to ZXY Euler order and the internal tolerance
+   * level
+   * @see VerifyAngles()
+   * @warning {Internally, the matrix check is performed with a tolerance level
+   * of 1e-6!}
+   */
+  bool FixAngles(double &outOfPlaneAngleRAD, double &gantryAngleRAD,
+                 double &inPlaneAngleRAD,
+                 const Matrix3x3Type &referenceMatrix) const;
+
   /** Circular geometry parameters per projection (angles in degrees between 0
     and 360). */
   std::vector<double> m_GantryAngles;
@@ -229,6 +326,22 @@ protected:
   std::vector<double> m_ProjectionOffsetsX;
   std::vector<double> m_ProjectionOffsetsY;
 
+  /** Radius of curved detector. The default is 0 and it means a flat detector. */
+  double m_RadiusCylindricalDetector;
+
+  /** Parameters of the collimation jaws.
+   * The collimation position is with respect to the distance of the m_RotationCenter along
+   * - the m_RotationAxis for the m_CollimationVInf and m_CollimationVSup,
+   * - the m_SourceCenter ^ m_RotationAxis for the m_CollimationUInf and m_CollimationUSup.
+   * The default is +infinity (itk::NumericTraits<double>::max) is completely
+   * opened, negative values are allowed if the collimation travels beyond the m_RotationCenter.
+   */
+  std::vector<double> m_CollimationUInf;
+  std::vector<double> m_CollimationUSup;
+  std::vector<double> m_CollimationVInf;
+  std::vector<double> m_CollimationVSup;
+
+  /** Matrices to change coordiate systems. */
   std::vector<TwoDHomogeneousMatrixType>         m_ProjectionTranslationMatrices;
   std::vector<Superclass::MatrixType>            m_MagnificationMatrices;
   std::vector<ThreeDHomogeneousMatrixType>       m_RotationMatrices;
@@ -239,5 +352,6 @@ private:
   void operator=(const Self&);                   //purposely not implemented
 };
 }
+
 
 #endif // __rtkThreeDCircularProjectionGeometry_h

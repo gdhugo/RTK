@@ -16,17 +16,15 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkLagCorrectionImageFilter_h
-#define __rtkLagCorrectionImageFilter_h
+#ifndef rtkLagCorrectionImageFilter_h
+#define rtkLagCorrectionImageFilter_h
 
 #include <itkInPlaceImageFilter.h>
 #include <itkVector.h>
-#include <itkArray.h>
-#include <itkSimpleFastMutexLock.h>
-#include <itkRealTimeClock.h>
 #include <vector>
 
 #include "rtkConfiguration.h"
+#include "rtkMacro.h"
 
 namespace rtk
 {
@@ -53,7 +51,8 @@ namespace rtk
 */
 
 template< typename TImage, unsigned ModelOrder >
-class ITK_EXPORT LagCorrectionImageFilter : public itk::InPlaceImageFilter < TImage, TImage >
+class LagCorrectionImageFilter
+: public itk::InPlaceImageFilter < TImage, TImage >
 {
 public:
 
@@ -72,15 +71,15 @@ public:
   typedef typename TImage::RegionType                  ImageRegionType;
   typedef typename TImage::SizeType                    ImageSizeType;
   typedef typename TImage::PixelType                   PixelType;
+  typedef typename TImage::IndexType                   IndexType;
   typedef typename itk::Vector<float, ModelOrder>      VectorType;
-  typedef typename itk::Image<VectorType, 3>           StateType;
-  typedef typename StateType::Pointer                  StateTypePtr;
   typedef typename std::vector<float>                  FloatVectorType;
+  typedef typename TImage::RegionType                  OutputImageRegionType;
 
   /** Get / Set the model parameters A and B*/
   itkGetMacro(A, VectorType)
-    itkGetMacro(B, VectorType)
-    virtual void SetCoefficients(const VectorType A, const VectorType B)
+  itkGetMacro(B, VectorType)
+  virtual void SetCoefficients(const VectorType A, const VectorType B)
   {
     if ((this->m_A != A) && (this->m_B != B))
     {
@@ -92,42 +91,39 @@ public:
     }
   }
 
-  /** Get / Set the average (over each the projection) correction values */
-  itkGetMacro(AvgCorrections, FloatVectorType);
-
 protected:
   LagCorrectionImageFilter();
-  virtual ~LagCorrectionImageFilter(){}
+  ~LagCorrectionImageFilter() {}
 
-  virtual void BeforeThreadedGenerateData();
+  void GenerateOutputInformation() ITK_OVERRIDE;
 
-  virtual void ThreadedGenerateData(const ImageRegionType & outputRegionForThread, ThreadIdType threadId);
+  void GenerateInputRequestedRegion() ITK_OVERRIDE;
 
-  virtual void AfterThreadedGenerateData();
+  void ThreadedGenerateData(const ImageRegionType & outputRegionForThread, itk::ThreadIdType threadId) ITK_OVERRIDE;
 
-  VectorType m_A;           // a_n coefficients
-  VectorType m_B;           // b coefficients
+  /** The correction is applied along the third (stack) dimension.
+      Therefore, we must avoid splitting along the stack.
+      The split is done along the second dimension. */
+  unsigned int SplitRequestedRegion(unsigned int i, unsigned int num, OutputImageRegionType& splitRegion) ITK_OVERRIDE;
+  virtual int SplitRequestedRegion(int i, int num, OutputImageRegionType& splitRegion);
+
+  VectorType m_A;           // a_n coefficients (lag rates)
+  VectorType m_B;           // b coefficients (lag coefficients)
   VectorType m_ExpmA;       // exp(-a)
-  VectorType m_BExpmA;      // b exp(-a)
+  float      m_SumB;        // normalization factor
+
+protected:
+  FloatVectorType m_S;                      // State variable
 
 private:
-  LagCorrectionImageFilter(const Self &); //purposely not implemented
-  void operator=(const Self &);  //purposely not implemented
+  LagCorrectionImageFilter(const Self &); // purposely not implemented
+  void operator=(const Self &);           // purposely not implemented
 
-  unsigned int m_M;         // Projection size
-  StateTypePtr m_S;         // State variable
-
-  itk::SimpleFastMutexLock m_Mutex;
-
-  unsigned int m_ImageId;     // Image counter (from parameters reception)
-  bool         m_NewParamJustReceived;
-  bool         m_StatusMatrixAllocated;
-
-  float           m_ThAvgCorr;
-  FloatVectorType m_AvgCorrections;
+  bool            m_NewParamJustReceived;   // For state/correction initialization
+  IndexType       m_StartIdx;               // To account for cropping
 };
 
-} //namespace RTK
+}
 
 #ifndef ITK_MANUAL_INSTANTIATION
 #include "rtkLagCorrectionImageFilter.hxx"

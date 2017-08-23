@@ -16,8 +16,8 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkThreeDCircularProjectionGeometryXMLFile_h
-#define __rtkThreeDCircularProjectionGeometryXMLFile_h
+#ifndef rtkThreeDCircularProjectionGeometryXMLFile_h
+#define rtkThreeDCircularProjectionGeometryXMLFile_h
 
 #ifdef _MSC_VER
 #pragma warning ( disable : 4786 )
@@ -55,7 +55,7 @@ public:
   typedef GeometryType::Pointer            GeometryPointer;
 
   /** Latest version */
-  static const unsigned int CurrentVersion = 2;
+  static const unsigned int CurrentVersion = 3;
 
   /** Run-time type information (and related methods). */
   itkTypeMacro(ThreeDCircularProjectionGeometryXMLFileReader, itk::XMLFileReader);
@@ -71,7 +71,7 @@ public:
 
 protected:
   ThreeDCircularProjectionGeometryXMLFileReader();
-  ~ThreeDCircularProjectionGeometryXMLFileReader() { };
+  ~ThreeDCircularProjectionGeometryXMLFileReader() {}
 
   /** Callback function -- called from XML parser with start-of-element
    * information.
@@ -103,6 +103,10 @@ private:
   double m_SourceToDetectorDistance;
   double m_ProjectionOffsetX;
   double m_ProjectionOffsetY;
+  double m_CollimationUInf;
+  double m_CollimationUSup;
+  double m_CollimationVInf;
+  double m_CollimationVSup;
 
   /** Projection matrix */
   ThreeDCircularProjectionGeometry::MatrixType m_Matrix;
@@ -142,7 +146,7 @@ public:
 
 protected:
   ThreeDCircularProjectionGeometryXMLFileWriter() {};
-  ~ThreeDCircularProjectionGeometryXMLFileWriter() {};
+  ~ThreeDCircularProjectionGeometryXMLFileWriter() {}
   
   /** If all values are equal in v, write first value (if not 0.) in
       output file with parameter value s and return true. Return false
@@ -150,7 +154,8 @@ protected:
    */
   bool WriteGlobalParameter(std::ofstream &output, const std::string &indent,
                             const std::vector<double> &v, const std::string &s,
-                            bool convertToDegrees=false);
+                            bool convertToDegrees=false,
+                            double defval=0.);
 
   /** Write projection specific parameter with name s. */
   void WriteLocalParameter(std::ofstream &output, const std::string &indent,

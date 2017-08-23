@@ -66,7 +66,7 @@ int main(int argc, char * argv[])
   //
   // You will need to use the DisconnectPipeline()
   // function. You can see how it is used in
-  // rtkSARTConeBeamReconstructionFilter.txx
+  // rtkSARTConeBeamReconstructionFilter.hxx
 
   typedef float OutputPixelType;
   const unsigned int Dimension = 3;
@@ -91,7 +91,7 @@ int main(int argc, char * argv[])
   WriterType::Pointer writer = WriterType::New();
   writer->SetFileName( args_info.output_arg );
   writer->SetInput( add->GetOutput() );
-  TRY_AND_EXIT_ON_ITK_EXCEPTION( writer->Update() );
+  TRY_AND_EXIT_ON_ITK_EXCEPTION( writer->Update() )
 
   return EXIT_SUCCESS;
 }

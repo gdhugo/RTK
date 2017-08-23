@@ -16,8 +16,8 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkBackwardDifferenceDivergenceImageFilter_hxx
-#define __rtkBackwardDifferenceDivergenceImageFilter_hxx
+#ifndef rtkBackwardDifferenceDivergenceImageFilter_hxx
+#define rtkBackwardDifferenceDivergenceImageFilter_hxx
 #include "rtkBackwardDifferenceDivergenceImageFilter.h"
 
 #include <itkConstShapedNeighborhoodIterator.h>
@@ -43,7 +43,7 @@ BackwardDifferenceDivergenceImageFilter<TInputImage, TOutputImage>
   m_IsBoundaryConditionOverriden = false;
 
   // default behaviour is to process all dimensions
-  for (int dim = 0; dim < TInputImage::ImageDimension; dim++)
+  for (unsigned int dim = 0; dim < TInputImage::ImageDimension; dim++)
     {
     m_DimensionsProcessed[dim] = true;
     }
@@ -53,9 +53,7 @@ template <class TInputImage, class TOutputImage>
 BackwardDifferenceDivergenceImageFilter<TInputImage, TOutputImage>
 ::~BackwardDifferenceDivergenceImageFilter()
 {
-  // If the boundary condition has been overriden, the memory
-  // m_BoundaryCondition points to will be released outside this filter
-  if (!m_IsBoundaryConditionOverriden) delete m_BoundaryCondition;
+  delete m_BoundaryCondition;
 }
 
 // This should be handled by an itkMacro, but it doesn't seem to work with pointer types
@@ -65,7 +63,7 @@ BackwardDifferenceDivergenceImageFilter<TInputImage, TOutputImage>
 ::SetDimensionsProcessed(bool* DimensionsProcessed)
 {
   bool Modified=false;
-  for (int dim=0; dim<TInputImage::ImageDimension; dim++)
+  for (unsigned int dim=0; dim<TInputImage::ImageDimension; dim++)
     {
     if (m_DimensionsProcessed[dim] != DimensionsProcessed[dim])
       {
@@ -139,8 +137,18 @@ void
 BackwardDifferenceDivergenceImageFilter< TInputImage, TOutputImage>
 ::BeforeThreadedGenerateData()
 {
-  m_SpacingCoeffs= this->GetInput()->GetSpacing();
-  if (m_UseImageSpacing == false) m_SpacingCoeffs.Fill(1);
+  if (m_UseImageSpacing == false)
+    {
+    m_InvSpacingCoeffs.Fill(1.0);
+    }
+  else
+    {
+    m_InvSpacingCoeffs= this->GetInput()->GetSpacing();
+    for (unsigned int dim = 0; dim < TInputImage::ImageDimension; dim++)
+      {
+      m_InvSpacingCoeffs[dim] = 1.0/m_InvSpacingCoeffs[dim];
+      }
+    }
 }
 
 template <class TInputImage, class TOutputImage>
@@ -150,15 +158,14 @@ BackwardDifferenceDivergenceImageFilter< TInputImage, TOutputImage>
 {
   // Generate a list of indices of the dimensions to process
   std::vector<int> dimsToProcess;
-  for (int dim = 0; dim < TInputImage::ImageDimension; dim++)
+  dimsToProcess.reserve(TInputImage::ImageDimension);
+  for (unsigned int dim = 0; dim < TInputImage::ImageDimension; dim++)
     {
     if(m_DimensionsProcessed[dim]) dimsToProcess.push_back(dim);
     }
 
   typename TOutputImage::Pointer output = this->GetOutput();
   typename TInputImage::ConstPointer input = this->GetInput();
-
-  itk::ConstantBoundaryCondition<InputImageType> cbc;
 
   itk::ImageRegionIterator<TOutputImage> oit(output, outputRegionForThread);
   oit.GoToBegin();
@@ -168,23 +175,22 @@ BackwardDifferenceDivergenceImageFilter< TInputImage, TOutputImage>
 
   itk::ConstNeighborhoodIterator<TInputImage> iit(radius, input, outputRegionForThread);
   iit.GoToBegin();
-  iit.OverrideBoundaryCondition(&cbc);
+  iit.OverrideBoundaryCondition(m_BoundaryCondition);
 
-  itk::SizeValueType c = (itk::SizeValueType) (iit.Size() / 2); // get offset of center pixel
+  const itk::SizeValueType c = (itk::SizeValueType) (iit.Size() / 2); // get offset of center pixel
   itk::SizeValueType strides[TOutputImage::ImageDimension]; // get offsets to access neighboring pixels
-  for (int dim=0; dim<TOutputImage::ImageDimension; dim++)
+  for (unsigned int dim=0; dim<TOutputImage::ImageDimension; dim++)
     {
     strides[dim] = iit.GetStride(dim);
     }
 
-  float div;
   while(!oit.IsAtEnd())
     {
-    div = 0;
+    typename TOutputImage::PixelType div = 0.0F;
     // Compute the local differences around the central pixel
     for (unsigned int k = 0; k < dimsToProcess.size(); k++)
       {
-      div += (iit.GetPixel(c)[k] - iit.GetPixel(c - strides[dimsToProcess[k]])[k]) / m_SpacingCoeffs[dimsToProcess[k]];
+      div += (iit.GetPixel(c)[k] - iit.GetPixel(c - strides[dimsToProcess[k]])[k]) * m_InvSpacingCoeffs[dimsToProcess[k]];
       }
     oit.Set(div);
     ++oit;
@@ -200,7 +206,7 @@ BackwardDifferenceDivergenceImageFilter< TInputImage, TOutputImage>
   if (m_IsBoundaryConditionOverriden) return;
 
   std::vector<int> dimsToProcess;
-  for (int dim = 0; dim < TInputImage::ImageDimension; dim++)
+  for (unsigned int dim = 0; dim < TInputImage::ImageDimension; dim++)
     {
     if(m_DimensionsProcessed[dim]) dimsToProcess.push_back(dim);
     }
@@ -228,7 +234,7 @@ BackwardDifferenceDivergenceImageFilter< TInputImage, TOutputImage>
       itk::ImageRegionIterator<TOutputImage> oit(this->GetOutput(), slice);
       itk::ImageRegionConstIterator<TInputImage> iit(this->GetInput(), slice);
 
-      oit.Set(oit.Get() - iit.Get()[k] / m_SpacingCoeffs[dimsToProcess[k]]);
+      oit.Set(oit.Get() - iit.Get()[k] * m_InvSpacingCoeffs[dimsToProcess[k]]);
       ++oit;
       ++iit;
       }

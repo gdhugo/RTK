@@ -92,7 +92,8 @@ int main(int argc, char * argv[])
   f->SetHannCutFrequencyY(args_info.hannY_arg); \
   f->SetProjectionSubsetSize(args_info.subsetsize_arg); \
   f->SetLambda( args_info.lambda_arg ); \
-  f->SetEnforcePositivity( enforcePositivity );
+  f->SetEnforcePositivity( enforcePositivity );\
+  f->SetDisableDisplacedDetectorFilter(args_info.nodisplaced_flag);
 
   // Create Iterative FDK filter and connect it
   typedef rtk::IterativeFDKConeBeamReconstructionFilter<OutputImageType, OutputImageType, double> IFDKCPUType;
@@ -129,7 +130,7 @@ int main(int argc, char * argv[])
   itk::TimeProbe writerProbe;
 
   writerProbe.Start();
-  TRY_AND_EXIT_ON_ITK_EXCEPTION( writer->Update() );
+  TRY_AND_EXIT_ON_ITK_EXCEPTION( writer->Update() )
   writerProbe.Stop();
 
   if(args_info.verbose_flag)

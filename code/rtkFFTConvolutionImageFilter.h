@@ -16,12 +16,14 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkFFTConvolutionImageFilter_h
-#define __rtkFFTConvolutionImageFilter_h
+#ifndef rtkFFTConvolutionImageFilter_h
+#define rtkFFTConvolutionImageFilter_h
 
 #include <itkImageToImageFilter.h>
 #include <itkConceptChecking.h>
+
 #include "rtkConfiguration.h"
+#include "rtkMacro.h"
 
 namespace rtk
 {
@@ -63,6 +65,7 @@ public:
   typedef typename itk::Image<std::complex<TFFTPrecision>,
                               TInputImage::ImageDimension > FFTOutputImageType;
   typedef typename FFTOutputImageType::Pointer              FFTOutputImagePointer;
+  typedef itk::Vector<int,2>                                ZeroPadFactorsType;
 
   /** ImageDimension constants */
   itkStaticConstMacro(ImageDimension, unsigned int,
@@ -93,18 +96,34 @@ public:
   itkGetConstMacro(TruncationCorrection, double);
   itkSetMacro(TruncationCorrection, double);
 
+  /** Set/Get the zero padding factors in x and y directions. Accepted values
+    * are either 1 and 2. The y value is only used if the convolution kernel is 2D.
+    */
+  itkGetConstMacro(ZeroPadFactors, ZeroPadFactorsType);
+  virtual void SetZeroPadFactors (ZeroPadFactorsType _arg)
+    {
+    if (m_ZeroPadFactors != _arg)
+      {
+      m_ZeroPadFactors = _arg;
+      m_ZeroPadFactors[0] = std::max(m_ZeroPadFactors[0], 1);
+      m_ZeroPadFactors[1] = std::max(m_ZeroPadFactors[1], 1);
+      m_ZeroPadFactors[0] = std::min(m_ZeroPadFactors[0], 2);
+      m_ZeroPadFactors[1] = std::min(m_ZeroPadFactors[1], 2);
+      this->Modified();
+      }
+    }
 
 protected:
   FFTConvolutionImageFilter();
-  ~FFTConvolutionImageFilter(){}
+  ~FFTConvolutionImageFilter() {}
 
-  virtual void GenerateInputRequestedRegion();
+  virtual void GenerateInputRequestedRegion() ITK_OVERRIDE;
 
-  virtual void BeforeThreadedGenerateData();
+  void BeforeThreadedGenerateData() ITK_OVERRIDE;
 
-  virtual void AfterThreadedGenerateData();
+  void AfterThreadedGenerateData() ITK_OVERRIDE;
 
-  virtual void ThreadedGenerateData( const RegionType& outputRegionForThread, ThreadIdType threadId );
+  void ThreadedGenerateData( const RegionType& outputRegionForThread, ThreadIdType threadId ) ITK_OVERRIDE;
 
   /** Pad the inputRegion region of the input image and returns a pointer to the new padded image.
     * Padding includes a correction for truncation [Ohnesorge, Med Phys, 2000].
@@ -113,7 +132,7 @@ protected:
   virtual FFTInputImagePointer PadInputImageRegion(const RegionType &inputRegion);
   RegionType GetPaddedImageRegion(const RegionType &inputRegion);
 
-  void PrintSelf(std::ostream& os, itk::Indent indent) const;
+  void PrintSelf(std::ostream& os, itk::Indent indent) const ITK_OVERRIDE;
 
   bool IsPrime( int n ) const;
 
@@ -149,6 +168,11 @@ private:
     */
   double m_TruncationCorrection;
   int GetTruncationCorrectionExtent();
+
+  /** Zero padding factors in x and y directions. Accepted values are either 1
+    * and 2. The y value is only used if the convolution kernel is 2D.
+    */
+  ZeroPadFactorsType m_ZeroPadFactors;
 
   /**
    * Greatest prime factor of the FFT input.

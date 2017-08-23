@@ -15,8 +15,8 @@
  *  limitations under the License.
  *
  *=========================================================================*/
-#ifndef __rtkInterpolatorWithKnownWeightsImageFilter_hxx
-#define __rtkInterpolatorWithKnownWeightsImageFilter_hxx
+#ifndef rtkInterpolatorWithKnownWeightsImageFilter_hxx
+#define rtkInterpolatorWithKnownWeightsImageFilter_hxx
 
 #include "rtkInterpolatorWithKnownWeightsImageFilter.h"
 
@@ -58,6 +58,20 @@ typename VolumeSeriesType::Pointer InterpolatorWithKnownWeightsImageFilter<Volum
 {
   return static_cast< VolumeSeriesType * >
           ( this->itk::ProcessObject::GetInput(1) );
+}
+
+template< typename VolumeType, typename VolumeSeriesType>
+void InterpolatorWithKnownWeightsImageFilter<VolumeType, VolumeSeriesType>::SetProjectionNumber(int n)
+{
+  // Check whether the weights change from the old projection number to the new one
+  for (unsigned int row=0; row < m_Weights.rows(); row++)
+    {
+    if (m_Weights[row][m_ProjectionNumber] != m_Weights[row][n])
+      this->Modified();
+    }
+
+  // Change the member variable whatever the result
+  m_ProjectionNumber = n;
 }
 
 template< typename VolumeType, typename VolumeSeriesType>

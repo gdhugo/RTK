@@ -16,8 +16,8 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkIterativeFDKConeBeamReconstructionFilter_h
-#define __rtkIterativeFDKConeBeamReconstructionFilter_h
+#ifndef rtkIterativeFDKConeBeamReconstructionFilter_h
+#define rtkIterativeFDKConeBeamReconstructionFilter_h
 
 #include <itkMultiplyImageFilter.h>
 #include <itkSubtractImageFilter.h>
@@ -153,10 +153,10 @@ public:
   itkSetMacro(EnforcePositivity, bool);
 
   /** Select the ForwardProjection filter */
-  void SetForwardProjectionFilter (int _arg);
+  void SetForwardProjectionFilter (int _arg) ITK_OVERRIDE;
 
   /** Select the backprojection filter */
-  void SetBackProjectionFilter (int _arg){}
+  void SetBackProjectionFilter (int _arg) ITK_OVERRIDE {}
 
   /** Get / Set the truncation correction */
   itkGetMacro(TruncationCorrection, double);
@@ -174,19 +174,23 @@ public:
   itkGetMacro(ProjectionSubsetSize, unsigned int);
   itkSetMacro(ProjectionSubsetSize, unsigned int);
 
+  /** Set / Get whether the displaced detector filter should be disabled */
+  itkSetMacro(DisableDisplacedDetectorFilter, bool)
+  itkGetMacro(DisableDisplacedDetectorFilter, bool)
+
 protected:
   IterativeFDKConeBeamReconstructionFilter();
-  ~IterativeFDKConeBeamReconstructionFilter(){}
+  ~IterativeFDKConeBeamReconstructionFilter() {}
 
-  virtual void GenerateInputRequestedRegion();
+  void GenerateInputRequestedRegion() ITK_OVERRIDE;
 
-  virtual void GenerateOutputInformation();
+  void GenerateOutputInformation() ITK_OVERRIDE;
 
-  virtual void GenerateData();
+  void GenerateData() ITK_OVERRIDE;
 
   /** The two inputs should not be in the same space so there is nothing
    * to verify. */
-  virtual void VerifyInputInformation() {}
+  void VerifyInputInformation() ITK_OVERRIDE {}
 
   /** Pointers to each subfilter of this composite filter */
   typename Superclass::ForwardProjectionPointerType m_ForwardProjectionFilter;
@@ -205,6 +209,7 @@ protected:
   double m_HannCutFrequency;
   double m_HannCutFrequencyY;
   double m_ProjectionSubsetSize;
+  bool   m_DisableDisplacedDetectorFilter;
 
 private:
   //purposely not implemented

@@ -16,8 +16,8 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkConjugateGradientConeBeamReconstructionFilter_h
-#define __rtkConjugateGradientConeBeamReconstructionFilter_h
+#ifndef rtkConjugateGradientConeBeamReconstructionFilter_h
+#define rtkConjugateGradientConeBeamReconstructionFilter_h
 
 #include <itkMultiplyImageFilter.h>
 #include <itkTimeProbe.h>
@@ -44,7 +44,7 @@ namespace rtk
    *
    * This filter implements the ConjugateGradient method.
    * ConjugateGradient attempts to find the f that minimizes
-   * || sqrt(D) (Rf -p) ||_2^2 + gamma || grad f ||_2^2
+   * (1/2).|| sqrt(D) (Rf -p) ||_2^2 + (1/2).gamma.|| grad f ||_2^2
    * with R the forward projection operator,
    * p the measured projections, and D the displaced detector weighting operator.
    *
@@ -66,6 +66,8 @@ namespace rtk
    * Input1 [shape=Mdiamond];
    * Input2 [label="Input 2 (Weights)"];
    * Input2 [shape=Mdiamond];
+   * Input3 [label="Input Support mask"];
+   * Input3 [shape=Mdiamond];
    * Output [label="Output (Volume)"];
    * Output [shape=Mdiamond];
    *
@@ -77,32 +79,15 @@ namespace rtk
    * Displaced [ label="rtk::DisplacedDetectorImageFilter" URL="\ref rtk::DisplacedDetectorImageFilter"];
    * ConjugateGradient[ label="rtk::ConjugateGradientImageFilter" URL="\ref rtk::ConjugateGradientImageFilter"];
    * VolumeSource [ label="rtk::ConstantImageSource (Volume)" URL="\ref rtk::ConstantImageSource"];
-   * ProjectionsSource [ label="rtk::ConstantImageSource (Projections)" URL="\ref rtk::ConstantImageSource"];
-   * BackProjForPreconditioning [ label="rtk::BackProjectionImageFilter" URL="\ref rtk::BackProjectionImageFilter"];
-   * BackProjForNormalization [ label="rtk::BackProjectionImageFilter" URL="\ref rtk::BackProjectionImageFilter"];
-   * Divide [label="itk::DivideOrZeroOutImageFilter" URL="\ref itk::DivideOrZeroOutImageFilter"];
-   *
-   * AfterVolumeSource [label="", fixedsize="false", width=0, height=0, shape=none];
-   * AfterDisplaced [label="", fixedsize="false", width=0, height=0, shape=none];
-   * AfterDivide [label="Preconditioning weights", fixedsize="false", width=0, height=0, shape=none];
-   *
+
    * Input0 -> ConjugateGradient;
    * Input1 -> MultiplyProjections;
    * Input2 -> Displaced;
-   * Displaced -> AfterDisplaced [arrowhead=none];
-   * AfterDisplaced -> BackProjForPreconditioning;
-   * AfterDisplaced -> MultiplyProjections;
+   * Displaced -> MultiplyProjections;
    * MultiplyProjections -> BackProjection;
-   * VolumeSource -> AfterVolumeSource [arrowhead=none];
-   * AfterVolumeSource -> BackProjection;
-   * AfterVolumeSource -> BackProjForPreconditioning;
-   * AfterVolumeSource -> BackProjForNormalization;
-   * ProjectionsSource -> BackProjForNormalization;
-   * BackProjForPreconditioning -> Divide;
-   * BackProjForNormalization -> Divide;
-   * Divide -> AfterDivide [arrowhead=none];
-   * AfterDivide -> MultiplyVolumes;
-   * AfterDivide -> MultiplyOutput;
+   * VolumeSource -> BackProjection;
+   * Input3 -> MultiplyVolumes;
+   * Input3 -> MultiplyOutput;
    * BackProjection -> MultiplyVolumes;
    * MultiplyVolumes -> ConjugateGradient;
    * ConjugateGradient -> MultiplyOutput;
@@ -147,12 +132,18 @@ public:
     typedef rtk::DisplacedDetectorImageFilter<TOutputImage>                  DisplacedDetectorFilterType;
     typedef rtk::ConstantImageSource<TOutputImage>                           ConstantImageSourceType;
     typedef itk::DivideOrZeroOutImageFilter<TOutputImage>                    DivideFilterType;
+    typedef itk::StatisticsImageFilter<TOutputImage>                         StatisticsImageFilterType;
+    typedef typename TOutputImage::Pointer                                   OutputImagePointer;
 
     /** Pass the ForwardProjection filter to the conjugate gradient operator */
-    void SetForwardProjectionFilter (int _arg);
+    void SetForwardProjectionFilter (int _arg) ITK_OVERRIDE;
 
     /** Pass the backprojection filter to the conjugate gradient operator and to the back projection filter generating the B of AX=B */
-    void SetBackProjectionFilter (int _arg);
+    void SetBackProjectionFilter (int _arg) ITK_OVERRIDE;
+
+    /** Set the support mask, if any, for support constraint in reconstruction */
+    void SetSupportMask(const TOutputImage *SupportMask);
+    typename TOutputImage::ConstPointer GetSupportMask();
 
     /** Pass the geometry to all filters needing it */
     itkSetMacro(Geometry, ThreeDCircularProjectionGeometry::Pointer)
@@ -163,11 +154,14 @@ public:
     itkSetMacro(MeasureExecutionTimes, bool)
     itkGetMacro(MeasureExecutionTimes, bool)
 
-    /** If Weighted and Preconditioned, computes preconditioning weights to speed up CG convergence */
-    itkSetMacro(Preconditioned, bool)
-    itkGetMacro(Preconditioned, bool)
-    
-    /** If Regularized, perform laplacian-based regularization during 
+    itkSetMacro(IterationCosts, bool)
+    itkGetMacro(IterationCosts, bool)
+
+    /** Set / Get whether the displaced detector filter should be disabled */
+    itkSetMacro(DisableDisplacedDetectorFilter, bool)
+    itkGetMacro(DisableDisplacedDetectorFilter, bool)
+
+    /** If Regularized, perform laplacian-based regularization during
      *  reconstruction (gamma is the strength of the regularization) */
     itkSetMacro(Regularized, bool)
     itkGetMacro(Regularized, bool)
@@ -178,12 +172,15 @@ public:
     itkGetMacro(CudaConjugateGradient, bool)
     itkSetMacro(CudaConjugateGradient, bool)
 
+    /** Getter for ResidualCosts storing array **/
+    const std::vector<double> &GetResidualCosts();
+
 protected:
     ConjugateGradientConeBeamReconstructionFilter();
-    ~ConjugateGradientConeBeamReconstructionFilter(){}
+    ~ConjugateGradientConeBeamReconstructionFilter() {}
 
     /** Does the real work. */
-    virtual void GenerateData();
+    void GenerateData() ITK_OVERRIDE;
 
     /** Member pointers to the filters used internally (for convenience)*/
     typename MultiplyFilterType::Pointer                                        m_MultiplyProjectionsFilter;
@@ -194,22 +191,18 @@ protected:
     typename ForwardProjectionImageFilter<TOutputImage, TOutputImage>::Pointer  m_ForwardProjectionFilter;
     typename BackProjectionImageFilter<TOutputImage, TOutputImage>::Pointer     m_BackProjectionFilter;
     typename BackProjectionImageFilter<TOutputImage, TOutputImage>::Pointer     m_BackProjectionFilterForB;
-    typename BackProjectionImageFilter<TOutputImage, TOutputImage>::Pointer     m_BackProjectionFilterForPreconditioning;
-    typename BackProjectionImageFilter<TOutputImage, TOutputImage>::Pointer     m_BackProjectionFilterForNormalization;
     typename DisplacedDetectorFilterType::Pointer                               m_DisplacedDetectorFilter;
     typename ConstantImageSourceType::Pointer                                   m_ConstantVolumeSource;
-    typename ConstantImageSourceType::Pointer                                   m_ConstantProjectionsSource;
-    typename DivideFilterType::Pointer                                          m_DivideFilter;
 
     /** The inputs of this filter have the same type (float, 3) but not the same meaning
     * It is normal that they do not occupy the same physical space. Therefore this check
     * must be removed */
-    void VerifyInputInformation(){}
+    void VerifyInputInformation() ITK_OVERRIDE {}
 
     /** The volume and the projections must have different requested regions
     */
-    void GenerateInputRequestedRegion();
-    void GenerateOutputInformation();
+    void GenerateInputRequestedRegion() ITK_OVERRIDE;
+    void GenerateOutputInformation() ITK_OVERRIDE;
 
 private:
     ConjugateGradientConeBeamReconstructionFilter(const Self &); //purposely not implemented
@@ -217,12 +210,13 @@ private:
 
     ThreeDCircularProjectionGeometry::Pointer m_Geometry;
 
-    int   m_NumberOfIterations;
-    float m_Gamma;
-    bool  m_MeasureExecutionTimes;
-    bool  m_Preconditioned;
-    bool  m_Regularized;
-    bool  m_CudaConjugateGradient;
+    int                          m_NumberOfIterations;
+    float                        m_Gamma;
+    bool                         m_MeasureExecutionTimes;
+    bool                         m_IterationCosts;
+    bool                         m_Regularized;
+    bool                         m_CudaConjugateGradient;
+    bool                         m_DisableDisplacedDetectorFilter;
 };
 } //namespace ITK
 

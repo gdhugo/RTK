@@ -16,8 +16,8 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkSARTConeBeamReconstructionFilter_hxx
-#define __rtkSARTConeBeamReconstructionFilter_hxx
+#ifndef rtkSARTConeBeamReconstructionFilter_hxx
+#define rtkSARTConeBeamReconstructionFilter_hxx
 
 #include "rtkSARTConeBeamReconstructionFilter.h"
 
@@ -79,6 +79,7 @@ SARTConeBeamReconstructionFilter<TInputImage, TOutputImage>
   m_IsGated = false;
   m_NumberOfProjectionsPerSubset = 1; //Default is the SART behavior
   m_DisplacedDetectorFilter->SetPadOnTruncatedSide(false);
+  m_DisableDisplacedDetectorFilter = false;
 }
 
 template<class TInputImage, class TOutputImage>
@@ -142,6 +143,8 @@ void
 SARTConeBeamReconstructionFilter<TInputImage, TOutputImage>
 ::GenerateOutputInformation()
 {
+  m_DisplacedDetectorFilter->SetDisable(m_DisableDisplacedDetectorFilter);
+
   // We only set the first sub-stack at that point, the rest will be
   // requested in the GenerateData function
   typename ExtractFilterType::InputImageRegionType projRegion;
@@ -170,7 +173,7 @@ SARTConeBeamReconstructionFilter<TInputImage, TOutputImage>
 
   // For the same reason, set geometry now
   // Check and set geometry
-  if(this->GetGeometry().GetPointer() == NULL)
+  if(this->GetGeometry().GetPointer() == ITK_NULLPTR)
     {
     itkGenericExceptionMacro(<< "The geometry of the reconstruction has not been set");
     }
@@ -438,4 +441,4 @@ SARTConeBeamReconstructionFilter<TInputImage, TOutputImage>
 
 } // end namespace rtk
 
-#endif // __rtkSARTConeBeamReconstructionFilter_hxx
+#endif // rtkSARTConeBeamReconstructionFilter_hxx

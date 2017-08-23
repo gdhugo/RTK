@@ -16,8 +16,8 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkDisplacedDetectorImageFilter_h
-#define __rtkDisplacedDetectorImageFilter_h
+#ifndef rtkDisplacedDetectorImageFilter_h
+#define rtkDisplacedDetectorImageFilter_h
 
 #include <itkInPlaceImageFilter.h>
 #include "rtkThreeDCircularProjectionGeometry.h"
@@ -101,21 +101,25 @@ public:
   itkGetMacro(MinimumOffset, double);
   itkGetMacro(MaximumOffset, double);
 
+  /** Get / Set the Disable parameter
+   */
+  itkGetMacro(Disable, bool);
+  itkSetMacro(Disable, bool);
+
 protected:
   DisplacedDetectorImageFilter();
 
-  ~DisplacedDetectorImageFilter(){
-  }
+  ~DisplacedDetectorImageFilter() {}
 
   /** Retrieve computed inferior and superior corners */
   itkGetMacro(InferiorCorner, double);
   itkGetMacro(SuperiorCorner, double);
 
-  virtual void GenerateInputRequestedRegion();
+  void GenerateInputRequestedRegion() ITK_OVERRIDE;
 
-  virtual void GenerateOutputInformation();
+  void GenerateOutputInformation() ITK_OVERRIDE;
 
-  virtual void ThreadedGenerateData(const OutputImageRegionType& outputRegionForThread, ThreadIdType threadId );
+  void ThreadedGenerateData(const OutputImageRegionType& outputRegionForThread, ThreadIdType threadId ) ITK_OVERRIDE;
 
   // Iterative filters do not need padding
   bool m_PadOnTruncatedSide;
@@ -145,6 +149,11 @@ private:
    */
   double m_InferiorCorner;
   double m_SuperiorCorner;
+
+  /** When using a geometry that the displaced detector cannot manage,
+   * it has to be disabled
+   */
+  bool m_Disable;
 
 }; // end of class
 

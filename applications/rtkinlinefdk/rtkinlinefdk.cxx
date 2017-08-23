@@ -28,11 +28,7 @@
 #ifdef RTK_USE_CUDA
 # include "rtkCudaFDKConeBeamReconstructionFilter.h"
 #endif
-#ifdef RTK_USE_OPENCL
-# include "rtkOpenCLFDKConeBeamReconstructionFilter.h"
-#endif
 
-#include <itkRegularExpressionSeriesFileNames.h>
 #include <itkImageFileWriter.h>
 #include <itkSimpleFastMutexLock.h>
 #include <itkMultiThreader.h>
@@ -46,6 +42,7 @@ struct ThreadInfoStruct
   args_info_rtkinlinefdk *args_info;
   bool stop;
   unsigned int nproj;
+  double radius;
   double sid;
   double sdd;
   double gantryAngle;
@@ -96,18 +93,8 @@ static ITK_THREAD_RETURN_TYPE AcquisitionCallback(void *arg)
 
   threadInfo->mutex.Lock();
 
-  // Generate file names
-  itk::RegularExpressionSeriesFileNames::Pointer names = itk::RegularExpressionSeriesFileNames::New();
-  names->SetDirectory(threadInfo->args_info->path_arg);
-  names->SetNumericSort(threadInfo->args_info->nsort_flag);
-  names->SetRegularExpression(threadInfo->args_info->regexp_arg);
-  names->SetSubMatch(threadInfo->args_info->submatch_arg);
-
-  if(threadInfo->args_info->verbose_flag)
-    std::cout << "Regular expression matches "
-              << names->GetFileNames().size()
-              << " file(s)..."
-              << std::endl;
+  // Get file names
+  std::vector<std::string> names = rtk::GetProjectionsFileNamesFromGgo( *(threadInfo->args_info) );
 
   // Geometry
   if(threadInfo->args_info->verbose_flag)
@@ -123,6 +110,9 @@ static ITK_THREAD_RETURN_TYPE AcquisitionCallback(void *arg)
   // Computes the minimum and maximum offsets from Geometry
   computeOffsetsFromGeometry(geometryReader->GetOutputObject(), &minOffset, &maxOffset);
   std::cout << " main :"<<  minOffset << " "<< maxOffset <<std::endl;
+
+  // Set the radius of the cylindrical detector (0 means flat)
+  threadInfo->radius = geometryReader->GetOutputObject()->GetRadiusCylindricalDetector();
 
   threadInfo->mutex.Unlock();
 
@@ -143,7 +133,7 @@ static ITK_THREAD_RETURN_TYPE AcquisitionCallback(void *arg)
     threadInfo->outOfPlaneAngle = geometry->GetOutOfPlaneAngles()[i];
     threadInfo->minimumOffsetX = minOffset;
     threadInfo->maximumOffsetX = maxOffset;
-    threadInfo->fileName = names->GetFileNames()[ vnl_math_min( i, (unsigned int)names->GetFileNames().size()-1 ) ];
+    threadInfo->fileName = names[ vnl_math_min( i, (unsigned int)names.size()-1 ) ];
     threadInfo->nproj = i+1;
     threadInfo->stop = (i==nproj-1);
     if(threadInfo->args_info->verbose_flag)
@@ -201,6 +191,7 @@ static ITK_THREAD_RETURN_TYPE InlineThreadCallback(void *arg)
   DDFType::Pointer ddf = DDFType::New();
   ddf->SetInput( extract->GetOutput() );
   ddf->SetGeometry( geometry );
+  ddf->SetDisable(threadInfo->args_info->nodisplaced_flag);
 
   // Short scan image filter
 //  typedef rtk::ParkerShortScanImageFilter< OutputImageType > PSSFType;
@@ -225,10 +216,6 @@ static ITK_THREAD_RETURN_TYPE InlineThreadCallback(void *arg)
   typedef rtk::CudaFDKConeBeamReconstructionFilter FDKCUDAType;
   FDKCUDAType::Pointer feldkampCUDA = FDKCUDAType::New();
 #endif
-#ifdef RTK_USE_OPENCL
-  typedef rtk::OpenCLFDKConeBeamReconstructionFilter FDKOPENCLType;
-  FDKOPENCLType::Pointer feldkampOCL = FDKOPENCLType::New();
-#endif
   if(!strcmp(threadInfo->args_info->hardware_arg, "cpu") )
     {
     SET_FELDKAMP_OPTIONS(feldkampCPU);
@@ -242,20 +229,14 @@ static ITK_THREAD_RETURN_TYPE InlineThreadCallback(void *arg)
     exit(EXIT_FAILURE);
 #endif
     }
-  else if(!strcmp(threadInfo->args_info->hardware_arg, "opencl") )
-    {
-#ifdef RTK_USE_OPENCL
-    SET_FELDKAMP_OPTIONS( feldkampOCL );
-#else
-    std::cerr << "The program has not been compiled with opencl option" << std::endl;
-    exit(EXIT_FAILURE);
-#endif
-    }
 
   // Writer
   typedef itk::ImageFileWriter<  CPUOutputImageType > WriterType;
   WriterType::Pointer writer = WriterType::New();
   writer->SetFileName( threadInfo->args_info->output_arg );
+
+  // Set the cylindrical detector's radius
+  geometry->SetRadiusCylindricalDetector(threadInfo->radius);
 
   threadInfo->mutex.Unlock();
 
@@ -299,7 +280,7 @@ static ITK_THREAD_RETURN_TYPE InlineThreadCallback(void *arg)
                 << region.GetIndex()[2]<<std::endl;
 
       reader->SetFileNames( fileNames );
-      reader->UpdateOutputInformation();
+      TRY_AND_EXIT_ON_ITK_EXCEPTION( reader->UpdateOutputInformation() )
       subsetRegion = reader->GetOutput()->GetLargestPossibleRegion();
       subsetRegion.SetIndex(Dimension-1, geometry->GetMatrices().size()-2);
       subsetRegion.SetSize(Dimension-1, 1);
@@ -325,33 +306,22 @@ static ITK_THREAD_RETURN_TYPE InlineThreadCallback(void *arg)
 
       if(!strcmp(threadInfo->args_info->hardware_arg, "cpu") )
         {
-        TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampCPU->Update() );
+        TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampCPU->Update() )
         OutputImageType::Pointer pimg = feldkampCPU->GetOutput();
         pimg->DisconnectPipeline();
         feldkampCPU->SetInput( pimg );
-        TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampCPU->GetOutput()->UpdateOutputInformation() );
+        TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampCPU->GetOutput()->UpdateOutputInformation() )
         TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampCPU->GetOutput()->PropagateRequestedRegion() );
         }
 #ifdef RTK_USE_CUDA
       else if(!strcmp(threadInfo->args_info->hardware_arg, "cuda") )
         {
-        TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampCUDA->Update() );
+        TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampCUDA->Update() )
         OutputImageType::Pointer pimg = feldkampCUDA->GetOutput();
         pimg->DisconnectPipeline();
         feldkampCUDA->SetInput( pimg );
-        TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampCUDA->GetOutput()->UpdateOutputInformation() );
+        TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampCUDA->GetOutput()->UpdateOutputInformation() )
         TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampCUDA->GetOutput()->PropagateRequestedRegion() );
-        }
-#endif
-#ifdef RTK_USE_OPENCL
-      else if(!strcmp(threadInfo->args_info->hardware_arg, "opencl") )
-        {
-        TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampOCL->Update() );
-        CPUOutputImageType::Pointer pimg = feldkampOCL->GetOutput();
-        pimg->DisconnectPipeline();
-        feldkampOCL->SetInput( pimg );
-        TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampOCL->GetOutput()->UpdateOutputInformation() );
-        TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampOCL->GetOutput()->PropagateRequestedRegion() );
         }
 #endif
       if(threadInfo->args_info->verbose_flag)
@@ -365,33 +335,22 @@ static ITK_THREAD_RETURN_TYPE InlineThreadCallback(void *arg)
         extract->SetExtractionRegion(subsetRegion);
         if(!strcmp(threadInfo->args_info->hardware_arg, "cpu") )
           {
-          TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampCPU->Update() );
+          TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampCPU->Update() )
           OutputImageType::Pointer pimg = feldkampCPU->GetOutput();
           pimg->DisconnectPipeline();
           feldkampCPU->SetInput( pimg );
-          TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampCPU->GetOutput()->UpdateOutputInformation() );
+          TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampCPU->GetOutput()->UpdateOutputInformation() )
           TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampCPU->GetOutput()->PropagateRequestedRegion() );
           }
 #ifdef RTK_USE_CUDA
         else if(!strcmp(threadInfo->args_info->hardware_arg, "cuda") )
           {
-          TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampCUDA->Update() );
+          TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampCUDA->Update() )
           OutputImageType::Pointer pimg = feldkampCUDA->GetOutput();
           pimg->DisconnectPipeline();
           feldkampCUDA->SetInput( pimg );
-          TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampCUDA->GetOutput()->UpdateOutputInformation() );
+          TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampCUDA->GetOutput()->UpdateOutputInformation() )
           TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampCUDA->GetOutput()->PropagateRequestedRegion() );
-          }
-#endif
-#ifdef RTK_USE_OPENCL
-        else if(!strcmp(threadInfo->args_info->hardware_arg, "opencl") )
-          {
-          TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampOCL->Update() );
-          CPUOutputImageType::Pointer pimg = feldkampOCL->GetOutput();
-          pimg->DisconnectPipeline();
-          feldkampOCL->SetInput( pimg );
-          TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampOCL->GetOutput()->UpdateOutputInformation() );
-          TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampOCL->GetOutput()->PropagateRequestedRegion() );
           }
 #endif
         if(threadInfo->args_info->verbose_flag)
@@ -403,21 +362,14 @@ static ITK_THREAD_RETURN_TYPE InlineThreadCallback(void *arg)
         extract->SetExtractionRegion(subsetRegion);
         if(!strcmp(threadInfo->args_info->hardware_arg, "cpu") )
           {
-          TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampCPU->Update() );
+          TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampCPU->Update() )
           writer->SetInput( feldkampCPU->GetOutput() );
           }
 #ifdef RTK_USE_CUDA
         else if(!strcmp(threadInfo->args_info->hardware_arg, "cuda") )
           {
-          TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampCUDA->Update() );
+          TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampCUDA->Update() )
           writer->SetInput( feldkampCUDA->GetOutput() );
-          }
-#endif
-#ifdef RTK_USE_OPENCL
-        else if(!strcmp(threadInfo->args_info->hardware_arg, "opencl") )
-          {
-          TRY_AND_EXIT_ON_ITK_EXCEPTION( feldkampOCL->Update() );
-          writer->SetInput( feldkampOCL->GetOutput() );
           }
 #endif
         if(threadInfo->args_info->verbose_flag)
@@ -425,7 +377,7 @@ static ITK_THREAD_RETURN_TYPE InlineThreadCallback(void *arg)
                     << " has been processed in reconstruction." << std::endl;
 
         //Write to disk and exit
-        TRY_AND_EXIT_ON_ITK_EXCEPTION( writer->Update() );
+        TRY_AND_EXIT_ON_ITK_EXCEPTION( writer->Update() )
         exit(EXIT_SUCCESS);
         }
       }

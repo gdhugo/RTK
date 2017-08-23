@@ -22,6 +22,7 @@
 #include "srtkInterpolator.h"
 
 // todo this should be moved to a more local place
+#include "nsstd/auto_ptr.h"
 #include "srtkTransform.h"
 #include "srtkThreeDCircularProjectionGeometry.h"
 
@@ -35,6 +36,18 @@
   // Don't hide symbols in the static SimpleRTKBasicFilters library in case
   // -fvisibility=hidden is used
   #define SRTKBasicFilters0_EXPORT
+#endif
+
+#if defined( SRTKDLL )
+#ifdef SimpleRTKBasicFilters1_EXPORTS
+#define SRTKBasicFilters1_EXPORT SRTK_ABI_EXPORT
+#else
+#define SRTKBasicFilters1_EXPORT SRTK_ABI_IMPORT
+#endif  /* SimpleRTKBasicFilters1_EXPORTS */
+#else
+// Don't hide symbols in the static SimpleRTKBasicFilters library in case
+// -fvisibility=hidden is used
+#define SRTKBasicFilters1_EXPORT
 #endif
 
 #if defined( SRTKDLL )

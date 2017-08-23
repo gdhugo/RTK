@@ -15,8 +15,8 @@
  *  limitations under the License.
  *
  *=========================================================================*/
-#ifndef __rtkFourDROOSTERConeBeamReconstructionFilter_h
-#define __rtkFourDROOSTERConeBeamReconstructionFilter_h
+#ifndef rtkFourDROOSTERConeBeamReconstructionFilter_h
+#define rtkFourDROOSTERConeBeamReconstructionFilter_h
 
 #include "rtkFourDConjugateGradientConeBeamReconstructionFilter.h"
 #include "rtkTotalVariationDenoiseSequenceImageFilter.h"
@@ -31,6 +31,7 @@
 #include "rtkWarpSequenceImageFilter.h"
 #include "rtkUnwarpSequenceImageFilter.h"
 #include "rtkLastDimensionL0GradientDenoisingImageFilter.h"
+#include "rtkTotalNuclearVariationDenoisingBPDQImageFilter.h"
 
 #include <itkThresholdImageFilter.h>
 #include <itkSubtractImageFilter.h>
@@ -59,6 +60,7 @@ namespace rtk
    * - Applying wavelets denoising in space
    * - Applying total variation denoising in time
    * - Applying gradient's L0 norm denoising in time
+   * - Applying total nuclear variation denoising
    * and starting over as many times as the number of main loop iterations desired.
    *
    * If both the displacement vector fields to a reference phase and from a reference phase are provided,
@@ -102,6 +104,7 @@ namespace rtk
    * Warp [group=regul, label="rtk::WarpSequenceImageFilter (direct field)" URL="\ref rtk::WarpSequenceImageFilter"];
    * TVTime [group=regul, label="rtk::TotalVariationDenoisingBPDQImageFilter (along time)" URL="\ref rtk::TotalVariationDenoisingBPDQImageFilter"];
    * L0Time [group=regul, label="rtk::LastDimensionL0GradientDenoisingImageFilter (along time)" URL="\ref rtk::LastDimensionL0GradientDenoisingImageFilter"];
+   * TNV [group=regul, label="rtk::TotalNuclearVariationDenoisingBPDQImageFilter" URL="\ref rtk::TotalNuclearVariationDenoisingBPDQImageFilter"];
    * Unwarp [group=regul, label="rtk::UnwarpSequenceImageFilter" URL="\ref rtk::UnwarpSequenceImageFilter"];
    * Subtract [group=invwarp, label="itk::SubtractImageFilter" URL="\ref itk::SubtractImageFilter"];
    * InverseWarp [group=invwarp, label="rtk::WarpSequenceImageFilter (inverse field)" URL="\ref rtk::WarpSequenceImageFilter"];
@@ -116,6 +119,7 @@ namespace rtk
    * AfterWarp [group=invisible, label="m_PerformTVTemporalDenoising ?", fixedsize="false", width=0, height=0, shape=none];
    * AfterTVTime [group=invisible, label="m_PerformL0TemporalDenoising ?", fixedsize="false", width=0, height=0, shape=none];
    * AfterL0Time [group=invisible, label="m_ComputeInverseWarpingByConjugateGradient ?", fixedsize="false", width=0, height=0, shape=none];
+   * AfterTNV [group=invisible, label="m_PerformTNVDenoising ?", fixedsize="false", width=0, height=0, shape=none];
    * AfterUnwarp [group=invisible, label="", fixedsize="false", width=0, height=0, shape=none];
    *
    * InputDisplacementField -> Warp;
@@ -142,7 +146,9 @@ namespace rtk
    * TVTime -> AfterTVTime [arrowhead=none];
    * AfterTVTime -> L0Time [label="true"];
    * L0Time -> AfterL0Time;
-   * AfterL0Time -> Unwarp [label="true"];
+   * AfterL0Time -> TNV [label="true"];
+   * TNV -> AfterTNV;
+   * AfterTNV -> Unwarp [label="true"];
    * Unwarp -> AfterUnwarp
    * AfterUnwarp -> Output;
    * AfterUnwarp -> AfterPrimaryInput [style=dashed];
@@ -161,7 +167,8 @@ namespace rtk
    * AfterWavelets -> AfterWarp [label="false"];
    * AfterWarp -> AfterTVTime [label="false"];
    * AfterTVTime -> AfterL0Time [label="false"];
-   * AfterL0Time -> AfterUnwarp [label="m_PerformWarping = false"];
+   * AfterL0Time -> AfterTNV [label="false"];
+   * AfterTNV -> AfterUnwarp [label="m_PerformWarping = false"];
    *
    * // Invisible edges between the regularization filters
    * edge[style=invis];
@@ -171,7 +178,8 @@ namespace rtk
    * Wavelets -> Warp;
    * Warp -> TVTime;
    * TVTime -> L0Time;
-   * L0Time -> Unwarp;
+   * L0Time -> TNV;
+   * TNV -> Unwarp;
    *
    * InputInverseDisplacementField -> Subtract;
    * }
@@ -195,18 +203,18 @@ public:
   typedef ProjectionStackType                                                               VolumeType;
   typedef itk::CovariantVector< typename VolumeSeriesType::ValueType, VolumeSeriesType::ImageDimension - 1> CovariantVectorForSpatialGradient;
   typedef itk::CovariantVector< typename VolumeSeriesType::ValueType, 1>                                    CovariantVectorForTemporalGradient;
-  typedef CovariantVectorForSpatialGradient                                                                 MVFVectorType;
+  typedef CovariantVectorForSpatialGradient                                                                 DVFVectorType;
 
 #ifdef RTK_USE_CUDA
   typedef itk::CudaImage<CovariantVectorForSpatialGradient, VolumeSeriesType::ImageDimension>   SpatialGradientImageType;
   typedef itk::CudaImage<CovariantVectorForTemporalGradient, VolumeSeriesType::ImageDimension>  TemporalGradientImageType;
-  typedef itk::CudaImage<MVFVectorType, VolumeSeriesType::ImageDimension>                       MVFSequenceImageType;
-  typedef itk::CudaImage<MVFVectorType, VolumeSeriesType::ImageDimension - 1>                   MVFImageType;
+  typedef itk::CudaImage<DVFVectorType, VolumeSeriesType::ImageDimension>                       DVFSequenceImageType;
+  typedef itk::CudaImage<DVFVectorType, VolumeSeriesType::ImageDimension - 1>                   DVFImageType;
 #else
   typedef itk::Image<CovariantVectorForSpatialGradient, VolumeSeriesType::ImageDimension>       SpatialGradientImageType;
   typedef itk::Image<CovariantVectorForTemporalGradient, VolumeSeriesType::ImageDimension>      TemporalGradientImageType;
-  typedef itk::Image<MVFVectorType, VolumeSeriesType::ImageDimension>                           MVFSequenceImageType;
-  typedef itk::Image<MVFVectorType, VolumeSeriesType::ImageDimension - 1>                       MVFImageType;
+  typedef itk::Image<DVFVectorType, VolumeSeriesType::ImageDimension>                           DVFSequenceImageType;
+  typedef itk::Image<DVFVectorType, VolumeSeriesType::ImageDimension - 1>                       DVFImageType;
 #endif
 
   /** Method for creation through the object factory. */
@@ -228,10 +236,10 @@ public:
   typename VolumeType::Pointer            GetMotionMask();
 
   /** The motion vector fields used to warp the sequence before and after TV denoising along time */
-  void SetDisplacementField(const MVFSequenceImageType* MVFs);
-  void SetInverseDisplacementField(const MVFSequenceImageType* MVFs);
-  typename MVFSequenceImageType::Pointer            GetDisplacementField();
-  typename MVFSequenceImageType::Pointer            GetInverseDisplacementField();
+  void SetDisplacementField(const DVFSequenceImageType* DVFs);
+  void SetInverseDisplacementField(const DVFSequenceImageType* DVFs);
+  typename DVFSequenceImageType::Pointer            GetDisplacementField();
+  typename DVFSequenceImageType::Pointer            GetInverseDisplacementField();
 
   typedef rtk::FourDConjugateGradientConeBeamReconstructionFilter<VolumeSeriesType, ProjectionStackType>    FourDCGFilterType;
   typedef itk::ThresholdImageFilter<VolumeSeriesType>                                                       ThresholdFilterType;
@@ -239,24 +247,28 @@ public:
   typedef rtk::AverageOutOfROIImageFilter <VolumeSeriesType, VolumeType>                                    AverageOutOfROIFilterType;
   typedef rtk::TotalVariationDenoiseSequenceImageFilter<VolumeSeriesType>                                   SpatialTVDenoisingFilterType;
   typedef rtk::DaubechiesWaveletsDenoiseSequenceImageFilter<VolumeSeriesType>                               SpatialWaveletsDenoisingFilterType;
-  typedef rtk::WarpSequenceImageFilter<VolumeSeriesType, MVFSequenceImageType, VolumeType, MVFImageType>    WarpSequenceFilterType;
+  typedef rtk::WarpSequenceImageFilter<VolumeSeriesType, DVFSequenceImageType, VolumeType, DVFImageType>    WarpSequenceFilterType;
   typedef rtk::TotalVariationDenoisingBPDQImageFilter<VolumeSeriesType, TemporalGradientImageType>          TemporalTVDenoisingFilterType;
-  typedef rtk::UnwarpSequenceImageFilter<VolumeSeriesType, MVFSequenceImageType, VolumeType, MVFImageType>  UnwarpSequenceFilterType;
+  typedef rtk::UnwarpSequenceImageFilter<VolumeSeriesType, DVFSequenceImageType, VolumeType, DVFImageType>  UnwarpSequenceFilterType;
   typedef itk::SubtractImageFilter<VolumeSeriesType, VolumeSeriesType>                                      SubtractFilterType;
   typedef itk::AddImageFilter<VolumeSeriesType, VolumeSeriesType>                                           AddFilterType;
   typedef rtk::LastDimensionL0GradientDenoisingImageFilter<VolumeSeriesType>                                TemporalL0DenoisingFilterType;
+  typedef rtk::TotalNuclearVariationDenoisingBPDQImageFilter<VolumeSeriesType, SpatialGradientImageType>    TNVDenoisingFilterType;
 
   /** Pass the ForwardProjection filter to SingleProjectionToFourDFilter */
-  void SetForwardProjectionFilter(int fwtype);
+  void SetForwardProjectionFilter(int fwtype) ITK_OVERRIDE;
 
   /** Pass the backprojection filter to ProjectionStackToFourD*/
-  void SetBackProjectionFilter(int bptype);
+  void SetBackProjectionFilter(int bptype) ITK_OVERRIDE;
 
   /** Pass the interpolation weights to SingleProjectionToFourDFilter */
   virtual void SetWeights(const itk::Array2D<float> _arg);
 
-  void PrintTiming(std::ostream& os) const;
+//  void PrintTiming(std::ostream& os) const;
 
+  /** Set / Get whether the displaced detector filter should be disabled */
+  itkSetMacro(DisableDisplacedDetectorFilter, bool)
+  itkGetMacro(DisableDisplacedDetectorFilter, bool)
 
   // Regularization steps to perform
   itkSetMacro(PerformPositivity, bool)
@@ -273,18 +285,26 @@ public:
   itkGetMacro(PerformTVTemporalDenoising, bool)
   itkSetMacro(PerformL0TemporalDenoising, bool)
   itkGetMacro(PerformL0TemporalDenoising, bool)
+  itkSetMacro(PerformTNVDenoising, bool)
+  itkGetMacro(PerformTNVDenoising, bool)
   itkSetMacro(ComputeInverseWarpingByConjugateGradient, bool)
   itkGetMacro(ComputeInverseWarpingByConjugateGradient, bool)
   itkSetMacro(UseNearestNeighborInterpolationInWarping, bool)
   itkGetMacro(UseNearestNeighborInterpolationInWarping, bool)
   itkGetMacro(CudaConjugateGradient, bool)
   itkSetMacro(CudaConjugateGradient, bool)
- 
+
+  /** Set and Get for the UseCudaCyclicDeformation variable */
+  itkSetMacro(UseCudaCyclicDeformation, bool)
+  itkGetMacro(UseCudaCyclicDeformation, bool)
+
   // Regularization parameters
   itkSetMacro(GammaTVSpace, float)
   itkGetMacro(GammaTVSpace, float)
   itkSetMacro(GammaTVTime, float)
   itkGetMacro(GammaTVTime, float)
+  itkSetMacro(GammaTNV, float)
+  itkGetMacro(GammaTNV, float)
   itkSetMacro(LambdaL0Time, float)
   itkGetMacro(LambdaL0Time, float)
   itkSetMacro(SoftThresholdWavelets, float)
@@ -314,20 +334,23 @@ public:
   itkSetMacro(Geometry, typename ThreeDCircularProjectionGeometry::Pointer)
   itkGetMacro(Geometry, typename ThreeDCircularProjectionGeometry::Pointer)
 
+  /** Store the phase signal in a member variable */
+  virtual void SetSignal(const std::vector<double> signal);
+
 protected:
   FourDROOSTERConeBeamReconstructionFilter();
-  ~FourDROOSTERConeBeamReconstructionFilter(){}
+  ~FourDROOSTERConeBeamReconstructionFilter() {}
 
   /** Does the real work. */
-  virtual void GenerateData();
+  void GenerateData() ITK_OVERRIDE;
 
-  virtual void GenerateOutputInformation();
+  void GenerateOutputInformation() ITK_OVERRIDE;
 
-  virtual void GenerateInputRequestedRegion();
+  void GenerateInputRequestedRegion() ITK_OVERRIDE;
 
   // Inputs are not supposed to occupy the same physical space,
   // so there is nothing to verify
-  virtual void VerifyInputInformation(){}
+  void VerifyInputInformation() ITK_OVERRIDE {}
 
   /** Member pointers to the filters used internally (for convenience)*/
   typename FourDCGFilterType::Pointer                     m_FourDCGFilter;
@@ -343,6 +366,7 @@ protected:
   typename SubtractFilterType::Pointer                    m_SubtractFilter;
   typename AddFilterType::Pointer                         m_AddFilter;
   typename TemporalL0DenoisingFilterType::Pointer         m_L0DenoisingTime;
+  typename TNVDenoisingFilterType::Pointer                m_TNVDenoising;
 
   // Booleans :
   // should warping be performed ?
@@ -355,18 +379,24 @@ protected:
   bool  m_PerformWarping;
   bool  m_PerformTVTemporalDenoising;
   bool  m_PerformL0TemporalDenoising;
+  bool  m_PerformTNVDenoising;
   bool  m_ComputeInverseWarpingByConjugateGradient;
   bool  m_UseNearestNeighborInterpolationInWarping; //Default is false, linear interpolation is used instead
   bool  m_CudaConjugateGradient;
+  bool  m_UseCudaCyclicDeformation;
+  bool  m_DisableDisplacedDetectorFilter;
 
   // Regularization parameters
   float m_GammaTVSpace;
   float m_GammaTVTime;
+  float m_GammaTNV;
   float m_LambdaL0Time;
   float m_SoftThresholdWavelets;
   float m_PhaseShift;
   bool  m_DimensionsProcessedForTVSpace[VolumeSeriesType::ImageDimension];
   bool  m_DimensionsProcessedForTVTime[VolumeSeriesType::ImageDimension];
+
+  typename itk::ImageToImageFilter<VolumeSeriesType, VolumeSeriesType>::Pointer m_DownstreamFilter;
 
   /** Information for the wavelets denoising filter */
   unsigned int    m_Order;
@@ -381,16 +411,20 @@ protected:
   // Geometry
   typename rtk::ThreeDCircularProjectionGeometry::Pointer m_Geometry;
 
-  /** Time probes */
-  itk::TimeProbe m_CGProbe;
-  itk::TimeProbe m_PositivityProbe;
-  itk::TimeProbe m_MotionMaskProbe;
-  itk::TimeProbe m_TVSpatialDenoisingProbe;
-  itk::TimeProbe m_WaveletsSpatialDenoisingProbe;
-  itk::TimeProbe m_TVTemporalDenoisingProbe;
-  itk::TimeProbe m_L0TemporalDenoisingProbe;  
-  itk::TimeProbe m_WarpingProbe;
-  itk::TimeProbe m_UnwarpingProbe;
+  // Signal
+  std::vector<double>                            m_Signal;
+
+//  /** Time probes */
+//  itk::TimeProbe m_CGProbe;
+//  itk::TimeProbe m_PositivityProbe;
+//  itk::TimeProbe m_MotionMaskProbe;
+//  itk::TimeProbe m_TVSpatialDenoisingProbe;
+//  itk::TimeProbe m_WaveletsSpatialDenoisingProbe;
+//  itk::TimeProbe m_TVTemporalDenoisingProbe;
+//  itk::TimeProbe m_TNVDenoisingProbe;
+//  itk::TimeProbe m_L0TemporalDenoisingProbe;
+//  itk::TimeProbe m_WarpingProbe;
+//  itk::TimeProbe m_UnwarpingProbe;
 
 private:
   FourDROOSTERConeBeamReconstructionFilter(const Self &); //purposely not implemented

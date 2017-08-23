@@ -16,8 +16,8 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkWaterPrecorrectionImageFilter_hxx
-#define __rtkWaterPrecorrectionImageFilter_hxx
+#ifndef rtkWaterPrecorrectionImageFilter_hxx
+#define rtkWaterPrecorrectionImageFilter_hxx
 
 #include <itkImageRegionConstIterator.h>
 #include <itkImageRegionIterator.h>
@@ -36,7 +36,7 @@ WaterPrecorrectionImageFilter<TInputImage, TOutputImage>
 
 template <class TInputImage, class  TOutputImage>
 void WaterPrecorrectionImageFilter<TInputImage,TOutputImage>
-::ThreadedGenerateData(const OutputImageRegionType & outputRegionForThread, ThreadIdType threadId)
+::ThreadedGenerateData(const OutputImageRegionType & outputRegionForThread, ThreadIdType itkNotUsed(threadId) )
 {
   const int csize = m_Coefficients.size();
 
@@ -90,4 +90,4 @@ void WaterPrecorrectionImageFilter<TInputImage,TOutputImage>
 }
 } // end namespace rtk
 
-#endif // __rtkWaterPrecorrectionImageFilter_hxx
+#endif // rtkWaterPrecorrectionImageFilter_hxx

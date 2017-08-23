@@ -16,11 +16,14 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkImportImageFilter_hxx
-#define __rtkImportImageFilter_hxx
+#ifndef rtkImportImageFilter_hxx
+#define rtkImportImageFilter_hxx
 
 #include "rtkImportImageFilter.h"
-#include "itkObjectFactory.h"
+#include <itkObjectFactory.h>
+#ifdef RTK_USE_CUDA
+# include <itkCudaImage.h>
+#endif
 
 namespace rtk
 {
@@ -40,7 +43,7 @@ ImportImageFilter< TImage >
     }
   m_Direction.SetIdentity();
 
-  m_ImportPointer = 0;
+  m_ImportPointer = ITK_NULLPTR;
   m_FilterManageMemory = false;
   m_Size = 0;
 }
@@ -197,6 +200,19 @@ ImportImageFilter< TImage >
   // opposed to the container) if the user wants it to.
   outputPtr->GetPixelContainer()->SetImportPointer(m_ImportPointer,
                                                    m_Size, false);
+
+#ifdef RTK_USE_CUDA
+  typedef itk::CudaImage<typename TImage::PixelType, TImage::ImageDimension> TCudaImage;
+  if (TCudaImage* cudaOutputPtr = dynamic_cast<TCudaImage*>(outputPtr.GetPointer()))
+    {
+    cudaOutputPtr->GetDataManager()->SetBufferSize(m_Size * sizeof(typename TImage::PixelType));
+    cudaOutputPtr->GetDataManager()->SetImagePointer(cudaOutputPtr);
+    cudaOutputPtr->GetDataManager()->SetCPUBufferPointer(m_ImportPointer);
+    cudaOutputPtr->GetDataManager()->SetGPUDirtyFlag(true);
+    cudaOutputPtr->GetDataManager()->SetCPUDirtyFlag(false);
+    cudaOutputPtr->GetDataManager()->SetTimeStamp(outputPtr->GetPixelContainer()->GetTimeStamp());
+    }
+#endif
 }
 
 //----------------------------------------------------------------------------

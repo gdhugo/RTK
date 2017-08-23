@@ -15,12 +15,13 @@
  *  limitations under the License.
  *
  *=========================================================================*/
-#ifndef __rtkFourDReconstructionConjugateGradientOperator_h
-#define __rtkFourDReconstructionConjugateGradientOperator_h
+#ifndef rtkFourDReconstructionConjugateGradientOperator_h
+#define rtkFourDReconstructionConjugateGradientOperator_h
 
 #include "rtkConjugateGradientOperator.h"
 
 #include <itkArray2D.h>
+#include <itkMultiplyImageFilter.h>
 
 #include "rtkConstantImageSource.h"
 #include "rtkInterpolatorWithKnownWeightsImageFilter.h"
@@ -33,9 +34,9 @@
 #ifdef RTK_USE_CUDA
 #  include "rtkCudaInterpolateImageFilter.h"
 #  include "rtkCudaSplatImageFilter.h"
-#  include "rtkCudaDisplacedDetectorImageFilter.h"
 #  include "rtkCudaConstantVolumeSource.h"
 #  include "rtkCudaConstantVolumeSeriesSource.h"
+#  include "rtkCudaDisplacedDetectorImageFilter.h"
 #endif
 
 namespace rtk
@@ -82,6 +83,8 @@ namespace rtk
    * Input0 [shape=Mdiamond];
    * Input1 [label="Input 1 (Projections)"];
    * Input1 [shape=Mdiamond];
+   * Input2 [label="Input 2 (Projection weights)"];
+   * Input2 [shape=Mdiamond];
    * Output [label="Output (Reconstruction: 4D sequence of volumes)"];
    * Output [shape=Mdiamond];
    *
@@ -140,12 +143,13 @@ public:
     /** Run-time type information (and related methods). */
     itkTypeMacro(FourDReconstructionConjugateGradientOperator, ConjugateGradientOperator)
 
-    /** The 4D image to be updated.*/
+    /** Set/Get the 4D image to be updated.*/
     void SetInputVolumeSeries(const VolumeSeriesType* VolumeSeries);
+    typename VolumeSeriesType::ConstPointer GetInputVolumeSeries();
 
-    /** The image that will be backprojected, then added, with coefficients, to each 3D volume of the 4D image.
-    * It is 3D because the backprojection filters need it, but the third dimension, which is the number of projections, is 1  */
-    void SetInputProjectionStack(const ProjectionStackType* Projection);
+    /** Set/Get the stack of projections */
+    void SetInputProjectionStack(const ProjectionStackType* Projections);
+    typename ProjectionStackType::ConstPointer GetInputProjectionStack();
 
     typedef rtk::BackProjectionImageFilter< ProjectionStackType, ProjectionStackType >          BackProjectionFilterType;
     typedef rtk::ForwardProjectionImageFilter< ProjectionStackType, ProjectionStackType >       ForwardProjectionFilterType;
@@ -177,21 +181,25 @@ public:
     itkGetMacro(Weights, itk::Array2D<float>)
     itkSetMacro(Weights, itk::Array2D<float>)
 
+    /** Store the phase signal in a member variable */
+    virtual void SetSignal(const std::vector<double> signal);
+
+    /** Set / Get whether the displaced detector filter should be disabled */
+    itkSetMacro(DisableDisplacedDetectorFilter, bool)
+    itkGetMacro(DisableDisplacedDetectorFilter, bool)
+
 protected:
     FourDReconstructionConjugateGradientOperator();
-    ~FourDReconstructionConjugateGradientOperator(){}
-
-    typename VolumeSeriesType::ConstPointer GetInputVolumeSeries();
-    typename ProjectionStackType::ConstPointer GetInputProjectionStack();
+    ~FourDReconstructionConjugateGradientOperator() {}
 
     /** Builds the pipeline and computes output information */
-    virtual void GenerateOutputInformation();
+    void GenerateOutputInformation() ITK_OVERRIDE;
 
     /** Computes the requested region of input images */
-    virtual void GenerateInputRequestedRegion();
+    void GenerateInputRequestedRegion() ITK_OVERRIDE;
 
     /** Does the real work. */
-    virtual void GenerateData();
+    void GenerateData() ITK_OVERRIDE;
 
     /** Initialize the ConstantImageSourceFilter */
     void InitializeConstantSources();
@@ -212,6 +220,8 @@ protected:
     bool                                                  m_UseCudaSplat;
     bool                                                  m_UseCudaSources;
     itk::Array2D<float>                                   m_Weights;
+    std::vector<double>                                   m_Signal;
+    bool                                                  m_DisableDisplacedDetectorFilter;
 
 private:
     FourDReconstructionConjugateGradientOperator(const Self &); //purposely not implemented

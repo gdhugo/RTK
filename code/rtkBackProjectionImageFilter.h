@@ -16,14 +16,14 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkBackProjectionImageFilter_h
-#define __rtkBackProjectionImageFilter_h
+#ifndef rtkBackProjectionImageFilter_h
+#define rtkBackProjectionImageFilter_h
 
 #include "rtkConfiguration.h"
 
 #include <itkInPlaceImageFilter.h>
 #include <itkConceptChecking.h>
-#include "rtkProjectionGeometry.h"
+#include "rtkThreeDCircularProjectionGeometry.h"
 
 namespace rtk
 {
@@ -55,7 +55,7 @@ public:
   typedef typename TInputImage::PixelType                   InputPixelType;
   typedef typename TOutputImage::RegionType                 OutputImageRegionType;
 
-  typedef rtk::ProjectionGeometry<TOutputImage::ImageDimension>     GeometryType;
+  typedef rtk::ThreeDCircularProjectionGeometry                     GeometryType;
   typedef typename GeometryType::Pointer                            GeometryPointer;
   typedef typename GeometryType::MatrixType                         ProjectionMatrixType;
   typedef itk::Image<InputPixelType, TInputImage::ImageDimension-1> ProjectionImageType;
@@ -76,18 +76,23 @@ public:
   itkSetMacro(Transpose, bool);
 
 protected:
-  BackProjectionImageFilter() : m_Geometry(NULL), m_Transpose(false) {
+  BackProjectionImageFilter() : m_Geometry(ITK_NULLPTR), m_Transpose(false) {
     this->SetNumberOfRequiredInputs(2); this->SetInPlace( true );
   };
-  virtual ~BackProjectionImageFilter() {
-  }
+  ~BackProjectionImageFilter() {}
 
   /** Apply changes to the input image requested region. */
-  virtual void GenerateInputRequestedRegion();
+  void GenerateInputRequestedRegion() ITK_OVERRIDE;
 
-  virtual void BeforeThreadedGenerateData();
+  void BeforeThreadedGenerateData() ITK_OVERRIDE;
 
-  virtual void ThreadedGenerateData( const OutputImageRegionType& outputRegionForThread, ThreadIdType threadId );
+  void ThreadedGenerateData( const OutputImageRegionType& outputRegionForThread, ThreadIdType threadId ) ITK_OVERRIDE;
+
+  /** Special case when the detector is cylindrical and centered on source */
+  virtual void CylindricalDetectorCenteredOnSourceBackprojection(const OutputImageRegionType& region,
+                                                                 const ProjectionMatrixType& volIndexToProjPP,
+                                                                 const itk::Matrix<double, TInputImage::ImageDimension, TInputImage::ImageDimension>& projPPToProjIndex,
+                                                                 const ProjectionImagePointer projection);
 
   /** Optimized version when the rotation is parallel to X, i.e. matrix[1][0]
     and matrix[2][0] are zeros. */
@@ -101,7 +106,7 @@ protected:
 
   /** The two inputs should not be in the same space so there is nothing
    * to verify. */
-  virtual void VerifyInputInformation() {}
+  void VerifyInputInformation() ITK_OVERRIDE {}
 
   /** The input is a stack of projections, we need to interpolate in one projection
       for efficiency during interpolation. Use of itk::ExtractImageFilter is
@@ -114,12 +119,16 @@ protected:
       instead of the physical point to physical point projection matrix provided by Geometry */
   ProjectionMatrixType GetIndexToIndexProjectionMatrix(const unsigned int iProj);
 
-private:
-  BackProjectionImageFilter(const Self&); //purposely not implemented
-  void operator=(const Self&);            //purposely not implemented
+  ProjectionMatrixType GetVolumeIndexToProjectionPhysicalPointMatrix(const unsigned int iProj);
+
+  itk::Matrix<double, TInputImage::ImageDimension, TInputImage::ImageDimension> GetProjectionPhysicalPointToProjectionIndexMatrix();
 
   /** RTK geometry object */
   GeometryPointer m_Geometry;
+
+private:
+  BackProjectionImageFilter(const Self&); //purposely not implemented
+  void operator=(const Self&);            //purposely not implemented
 
   /** Flip projection flag: infludences GetProjection and
     GetIndexToIndexProjectionMatrix for optimization */

@@ -16,8 +16,8 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkProjectionsReader_h
-#define __rtkProjectionsReader_h
+#ifndef rtkProjectionsReader_h
+#define rtkProjectionsReader_h
 
 // ITK
 #include <itkImageSource.h>
@@ -26,6 +26,7 @@
 
 // RTK
 #include "rtkWaterPrecorrectionImageFilter.h"
+#include "rtkConditionalMedianImageFilter.h"
 
 // Standard lib
 #include <vector>
@@ -38,11 +39,12 @@ namespace rtk
  *
  * This is the universal projections reader of rtk (raw data converted to
  * attenuation). Currently handles his (Elekta Synergy), hnd (Varian OBI),
- * tiff (Digisens), edf (ESRF), XRad. For all other ITK file formats, it is
- * assumed that the attenuation is directly passed and there is no processing.
- * Optionnally, one can activate cropping, binning, scatter correction, etc.
- * The details of the mini-pipeline is provided below, note that dashed filters
- * are shunt if they are not required according to parameters.
+ * edf (ESRF), XRad. For all other ITK file formats (mha, tif, ...), it is
+ * assumed that the attenuation is directly passed if the pixel type is not
+ * unsigned short and there is no processing. Optionnally, one can activate
+ * cropping, binning, scatter correction, etc. The details of the mini-
+ * pipeline is provided below, note that dashed filters are shunt if they
+ * are not required according to parameters.
  *
  * \dot
  * digraph ProjectionsReader {
@@ -55,6 +57,7 @@ namespace rtk
  * ChangeInformation [label="itk::ChangeInformationImageFilter" URL="\ref itk::ChangeInformationImageFilter" style=dashed];
  * Crop [label="itk::CropImageFilter" URL="\ref itk::CropImageFilter" style=dashed];
  * Binning [label="itk::BinShrinkImageFilter" URL="\ref itk::BinShrinkImageFilter" style=dashed];
+ * ConditionalMedian [label="rtk::ConditionalMedianImageFilter" URL="\ref rtk::ConditionalMedianImageFilter" style=dashed];
  * Scatter [label="rtk::BoellaardScatterCorrectionImageFilter" URL="\ref rtk::BoellaardScatterCorrectionImageFilter" style=dashed];
  * I0est [label="rtk::I0EstimationProjectionFilter" URL="\ref rtk::I0EstimationProjectionFilter" style=dashed];
  * BeforeLUT [label="", fixedsize="false", width=0, height=0, shape=none];
@@ -68,19 +71,23 @@ namespace rtk
  * BeforeXRad [label="", fixedsize="false", width=0, height=0, shape=none];
  * XRad [label="rtk::XRadRawToAttenuationImageFilter"  URL="\ref rtk::XRadRawToAttenuationImageFilter"];
  * Cast [label="itk::CastImageFilter"  URL="\ref itk::CastImageFilter"];
+ * OraRaw [label="rtk::OraLookupTableImageFilter" URL="\ref rtk::OraLookupTableImageFilter"];
  *
  * Raw->ChangeInformation [label="Default"]
  * ChangeInformation->Crop
  * Crop->ElektaRaw [label="Elekta"]
- * ElektaRaw->Binning
- * Crop->Binning [label="Default"]
+ * Binning->OraRaw [label="Ora && ushort"]
+ * OraRaw->WPC
+ * ElektaRaw->ConditionalMedian
+ * Crop->ConditionalMedian[label="Default"]
+ * ConditionalMedian->Binning
  * Binning->Scatter [label="Elekta, Varian, IBA, ushort"]
  * Scatter->I0est [label="Default"]
  * I0est->BeforeLUT
  * BeforeLUT->LUT [label="ComputeLineIntegral\n(default)"]
  * BeforeLUT->Cast
  * LUT->WPC
- * Scatter->BeforeVarian [label="Varian"]
+ * I0est->BeforeVarian [label="Varian"]
  * BeforeVarian->Varian [label="ComputeLineIntegral\n(default)"]
  * BeforeVarian->Cast
  * Varian->WPC
@@ -98,7 +105,7 @@ namespace rtk
  *
  * Binning->WPC [label="Default"]
  *
- * {rank=same; XRad EDF Varian LUT}
+ * {rank=same; XRad EDF Varian LUT OraRaw}
  * }
  * \enddot
  *
@@ -134,9 +141,10 @@ public:
   typedef typename OutputImageType::PointType      OutputImagePointType;
   typedef typename OutputImageType::SizeType       OutputImageSizeType;
 
-  typedef std::vector<std::string>                                      FileNamesContainer;
-  typedef itk::FixedArray< unsigned int, TOutputImage::ImageDimension > ShrinkFactorsType;
-  typedef std::vector< double >                                         WaterPrecorrectionVectorType;
+  typedef std::vector<std::string>                                                    FileNamesContainer;
+  typedef itk::FixedArray< unsigned int, TOutputImage::ImageDimension >               ShrinkFactorsType;
+  typedef typename rtk::ConditionalMedianImageFilter<TOutputImage>::MedianRadiusType  MedianRadiusType;
+  typedef std::vector< double >                                                       WaterPrecorrectionVectorType;
 
   /** Typdefs of filters of the mini-pipeline that do not depend on the raw
    * data type. */
@@ -182,6 +190,12 @@ public:
   itkSetMacro(ShrinkFactors, ShrinkFactorsType);
   itkGetConstReferenceMacro(ShrinkFactors, ShrinkFactorsType);
 
+  /** Set/Get itk::ConditionalMedianImageFilter parameters */
+  itkSetMacro(MedianRadius, MedianRadiusType);
+  itkGetConstReferenceMacro(MedianRadius, MedianRadiusType);
+  itkGetMacro(ConditionalMedianThresholdMultiplier, double);
+  itkSetMacro(ConditionalMedianThresholdMultiplier, double);
+
   /** Set/Get rtk::BoellaardScatterCorrectionImageFilter */
   itkGetMacro(AirThreshold, double);
   itkSetMacro(AirThreshold, double);
@@ -199,6 +213,12 @@ public:
   itkGetMacro(I0, double);
   itkSetMacro(I0, double);
 
+  /** Set/Get the intensity with no photons for
+   * rtk::LUTbasedVariableI0RawToAttenuationImageFilter.
+   */
+  itkGetMacro(IDark, double);
+  itkSetMacro(IDark, double);
+
   /** Get / Set the water precorrection parameters. */
   itkGetMacro(WaterPrecorrectionCoefficients, WaterPrecorrectionVectorType);
   virtual void SetWaterPrecorrectionCoefficients(const WaterPrecorrectionVectorType _arg)
@@ -211,22 +231,30 @@ public:
     }
 
   /** Convert the projection data to line integrals after pre-processing.
-  ** Default is off. */
+  ** Default is on. */
   itkSetMacro(ComputeLineIntegral, bool);
   itkGetConstMacro(ComputeLineIntegral, bool);
   itkBooleanMacro(ComputeLineIntegral);
 
+  /** Set/Get the index of the component to be extracted
+   * if the projection data contains vectors instead of scalars. */
+  itkGetMacro(VectorComponent, unsigned int)
+  itkSetMacro(VectorComponent, unsigned int)
+
+  /** Get the image IO that was used for reading the projection. */
+  itkGetMacro(ImageIO,  itk::ImageIOBase::Pointer);
+
   /** Prepare the allocation of the output image during the first back
    * propagation of the pipeline. */
-  virtual void GenerateOutputInformation(void);
+  void GenerateOutputInformation(void) ITK_OVERRIDE;
 
 protected:
   ProjectionsReader();
-  ~ProjectionsReader() {};
-  void PrintSelf(std::ostream& os, itk::Indent indent) const;
+  ~ProjectionsReader() {}
+  void PrintSelf(std::ostream& os, itk::Indent indent) const ITK_OVERRIDE;
 
   /** Does the real work. */
-  virtual void GenerateData();
+  void GenerateData() ITK_OVERRIDE;
 
   /** A list of filenames to be processed. */
   FileNamesContainer m_FileNames;
@@ -248,9 +276,11 @@ private:
   itk::ProcessObject::Pointer m_RawDataReader;
 
   /** Pointers for pre-processing filters that are created only when required. */
+  itk::ProcessObject::Pointer m_VectorComponentSelectionFilter;
   itk::ProcessObject::Pointer m_ChangeInformationFilter;
   itk::ProcessObject::Pointer m_ElektaRawFilter;
   itk::ProcessObject::Pointer m_CropFilter;
+  itk::ProcessObject::Pointer m_ConditionalMedianFilter;
   itk::ProcessObject::Pointer m_BinningFilter;
   itk::ProcessObject::Pointer m_ScatterFilter;
   itk::ProcessObject::Pointer m_I0EstimationFilter;
@@ -279,12 +309,16 @@ private:
   OutputImageSizeType          m_LowerBoundaryCropSize;
   OutputImageSizeType          m_UpperBoundaryCropSize;
   ShrinkFactorsType            m_ShrinkFactors;
+  MedianRadiusType             m_MedianRadius;
   double                       m_AirThreshold;
   double                       m_ScatterToPrimaryRatio;
   double                       m_NonNegativityConstraintThreshold;
   double                       m_I0;
+  double                       m_IDark;
+  double                       m_ConditionalMedianThresholdMultiplier;
   WaterPrecorrectionVectorType m_WaterPrecorrectionCoefficients;
   bool                         m_ComputeLineIntegral;
+  unsigned int                 m_VectorComponent;
 };
 
 } //namespace rtk
@@ -293,4 +327,4 @@ private:
 #include "rtkProjectionsReader.hxx"
 #endif
 
-#endif // __rtkProjectionsReader_h
+#endif // rtkProjectionsReader_h

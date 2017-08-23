@@ -16,12 +16,10 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkFDKWeightProjectionFilter_hxx
-#define __rtkFDKWeightProjectionFilter_hxx
+#ifndef rtkFDKWeightProjectionFilter_hxx
+#define rtkFDKWeightProjectionFilter_hxx
 
 #include <itkImageRegionIterator.h>
-#include <itkImageFileWriter.h>
-#include <itkMeanProjectionImageFilter.h>
 
 namespace rtk
 {

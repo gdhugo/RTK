@@ -16,8 +16,8 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkReconstructionConjugateGradientOperator_h
-#define __rtkReconstructionConjugateGradientOperator_h
+#ifndef rtkReconstructionConjugateGradientOperator_h
+#define rtkReconstructionConjugateGradientOperator_h
 
 #include <itkMultiplyImageFilter.h>
 #include <itkAddImageFilter.h>
@@ -67,7 +67,7 @@ namespace rtk
    * Input1 [shape=Mdiamond];
    * Input2 [label="Input 2 (Weights)"];
    * Input2 [shape=Mdiamond];
-   * Input3 [label="Input 3 (Preconditioning weights)"];
+   * Input3 [label="Input Support Mask"];
    * Input3 [shape=Mdiamond];
    * Output [label="Output (Volume)"];
    * Output [shape=Mdiamond];
@@ -122,7 +122,7 @@ public:
 #else
   typedef itk::Image<itk::CovariantVector<typename TOutputImage::ValueType, TOutputImage::ImageDimension >, TOutputImage::ImageDimension > GradientImageType;
 #endif
- 
+
   /** Method for creation through the object factory. */
   itkNewMacro(Self)
 
@@ -135,12 +135,13 @@ public:
   typedef rtk::ForwardProjectionImageFilter< TOutputImage, TOutputImage > ForwardProjectionFilterType;
   typedef typename ForwardProjectionFilterType::Pointer                   ForwardProjectionFilterPointer;
 
-//   typedef rtk::DisplacedDetectorImageFilter<TOutputImage>                 DisplacedDetectorFilterType;
   typedef rtk::ConstantImageSource<TOutputImage>                          ConstantSourceType;
   typedef itk::MultiplyImageFilter<TOutputImage>                          MultiplyFilterType;
   typedef itk::AddImageFilter<TOutputImage>                               AddFilterType;
 
   typedef rtk::LaplacianImageFilter<TOutputImage, GradientImageType>      LaplacianFilterType;
+
+  typedef typename TOutputImage::Pointer                                  OutputImagePointer;
 
   /** Set the backprojection filter*/
   void SetBackProjectionFilter (const BackProjectionFilterPointer _arg);
@@ -148,12 +149,12 @@ public:
   /** Set the forward projection filter*/
   void SetForwardProjectionFilter (const ForwardProjectionFilterPointer _arg);
 
+  /** Set the support mask, if any, for support constraint in reconstruction */
+  void SetSupportMask(const TOutputImage *SupportMask);
+  typename TOutputImage::ConstPointer GetSupportMask();
+
   /** Set the geometry of both m_BackProjectionFilter and m_ForwardProjectionFilter */
   itkSetMacro(Geometry, ThreeDCircularProjectionGeometry::Pointer)
-
-  /** If Weighted && Preconditioned, multiplies by preconditioning weights to speed up CG convergence */
-  itkSetMacro(Preconditioned, bool)
-  itkGetMacro(Preconditioned, bool)
   
   /** If Regularized, perform laplacian-based regularization during 
   *  reconstruction (gamma is the strength of the regularization) */
@@ -164,10 +165,10 @@ public:
 
 protected:
   ReconstructionConjugateGradientOperator();
-  ~ReconstructionConjugateGradientOperator(){}
+  ~ReconstructionConjugateGradientOperator() {}
 
   /** Does the real work. */
-  virtual void GenerateData();
+  void GenerateData() ITK_OVERRIDE;
 
   /** Member pointers to the filters used internally (for convenience)*/
   BackProjectionFilterPointer            m_BackProjectionFilter;
@@ -181,20 +182,23 @@ protected:
   typename MultiplyFilterType::Pointer              m_MultiplyLaplacianFilter;
   typename AddFilterType::Pointer                   m_AddFilter;
   typename LaplacianFilterType::Pointer             m_LaplacianFilter;
+  typename MultiplyFilterType::Pointer              m_MultiplySupportMaskFilter;
 
   /** Member attributes */
   rtk::ThreeDCircularProjectionGeometry::Pointer    m_Geometry;
-  bool                                              m_Preconditioned; //Multiply by preconditioning weights ?
   bool                                              m_Regularized;
   float                                             m_Gamma; //Strength of the regularization
 
+  /** Pointers to intermediate images, used to simplify complex branching */
+  typename TOutputImage::Pointer                    m_FloatingInputPointer, m_FloatingOutputPointer;
+
   /** When the inputs have the same type, ITK checks whether they occupy the
    * same physical space or not. Obviously they dont, so we have to remove this check */
-  void VerifyInputInformation(){}
+  void VerifyInputInformation() ITK_OVERRIDE {}
 
   /** The volume and the projections must have different requested regions */
-  void GenerateInputRequestedRegion();
-  void GenerateOutputInformation();
+  void GenerateInputRequestedRegion() ITK_OVERRIDE;
+  void GenerateOutputInformation() ITK_OVERRIDE;
 
 private:
   ReconstructionConjugateGradientOperator(const Self &); //purposely not implemented

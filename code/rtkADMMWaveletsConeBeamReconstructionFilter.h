@@ -16,8 +16,8 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkADMMWaveletsConeBeamReconstructionFilter_h
-#define __rtkADMMWaveletsConeBeamReconstructionFilter_h
+#ifndef rtkADMMWaveletsConeBeamReconstructionFilter_h
+#define rtkADMMWaveletsConeBeamReconstructionFilter_h
 
 #include <itkImageToImageFilter.h>
 #include <itkAddImageFilter.h>
@@ -171,10 +171,10 @@ public:
     typedef rtk::DisplacedDetectorImageFilter<TOutputImage>                               DisplacedDetectorFilterType;
 
     /** Pass the ForwardProjection filter to the conjugate gradient operator */
-    void SetForwardProjectionFilter (int _arg);
+    void SetForwardProjectionFilter (int _arg) ITK_OVERRIDE;
 
     /** Pass the backprojection filter to the conjugate gradient operator and to the back projection filter generating the B of AX=B */
-    void SetBackProjectionFilter (int _arg);
+    void SetBackProjectionFilter (int _arg) ITK_OVERRIDE;
 
     /** Pass the geometry to all filters needing it */
     itkSetMacro(Geometry, ThreeDCircularProjectionGeometry::Pointer)
@@ -199,12 +199,16 @@ public:
 
     void PrintTiming(std::ostream& os) const;
 
+    /** Set / Get whether the displaced detector filter should be disabled */
+    itkSetMacro(DisableDisplacedDetectorFilter, bool)
+    itkGetMacro(DisableDisplacedDetectorFilter, bool)
+
 protected:
     ADMMWaveletsConeBeamReconstructionFilter();
-    ~ADMMWaveletsConeBeamReconstructionFilter(){}
+    ~ADMMWaveletsConeBeamReconstructionFilter() {}
 
     /** Does the real work. */
-    virtual void GenerateData();
+    void GenerateData() ITK_OVERRIDE;
 
     /** Member pointers to the filters used internally (for convenience)*/
     typename SubtractFilterType::Pointer                                        m_SubtractFilter1;
@@ -224,12 +228,12 @@ protected:
     /** The inputs of this filter have the same type (float, 3) but not the same meaning
     * It is normal that they do not occupy the same physical space. Therefore this check
     * must be removed */
-    void VerifyInputInformation(){}
+    void VerifyInputInformation() ITK_OVERRIDE {}
 
     /** The volume and the projections must have different requested regions
     */
-    void GenerateInputRequestedRegion();
-    void GenerateOutputInformation();
+    void GenerateInputRequestedRegion() ITK_OVERRIDE;
+    void GenerateOutputInformation() ITK_OVERRIDE;
 
 private:
     ADMMWaveletsConeBeamReconstructionFilter(const Self &); //purposely not implemented
@@ -241,6 +245,7 @@ private:
     unsigned int    m_CG_iterations;
     unsigned int    m_Order;
     unsigned int    m_NumberOfLevels;
+    bool            m_DisableDisplacedDetectorFilter;
 
     ThreeDCircularProjectionGeometry::Pointer m_Geometry;
 

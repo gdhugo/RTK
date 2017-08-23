@@ -16,8 +16,8 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkADMMWaveletsConjugateGradientOperator_h
-#define __rtkADMMWaveletsConjugateGradientOperator_h
+#ifndef rtkADMMWaveletsConjugateGradientOperator_h
+#define rtkADMMWaveletsConjugateGradientOperator_h
 
 #include <itkMultiplyImageFilter.h>
 #include <itkAddImageFilter.h>
@@ -132,12 +132,16 @@ public:
     /** Set the regularization parameter */
     itkSetMacro(Beta, float)
 
+    /** Set / Get whether the displaced detector filter should be disabled */
+    itkSetMacro(DisableDisplacedDetectorFilter, bool)
+    itkGetMacro(DisableDisplacedDetectorFilter, bool)
+
 protected:
     ADMMWaveletsConjugateGradientOperator();
-    ~ADMMWaveletsConjugateGradientOperator(){}
+    ~ADMMWaveletsConjugateGradientOperator() {}
 
     /** Does the real work. */
-    virtual void GenerateData();
+    void GenerateData() ITK_OVERRIDE;
 
     /** Member pointers to the filters used internally (for convenience)*/
     BackProjectionFilterPointer            m_BackProjectionFilter;
@@ -150,16 +154,17 @@ protected:
     typename DisplacedDetectorFilterType::Pointer     m_DisplacedDetectorFilter;
 
     float m_Beta;
+    bool  m_DisableDisplacedDetectorFilter;
 
     /** When the inputs have the same type, ITK checks whether they occupy the
     * same physical space or not. Obviously they dont, so we have to remove this check
     */
-    void VerifyInputInformation(){}
+    void VerifyInputInformation() ITK_OVERRIDE {}
 
     /** The volume and the projections must have different requested regions
     */
-    void GenerateInputRequestedRegion();
-    void GenerateOutputInformation();
+    void GenerateInputRequestedRegion() ITK_OVERRIDE;
+    void GenerateOutputInformation() ITK_OVERRIDE;
 
 private:
     ADMMWaveletsConjugateGradientOperator(const Self &); //purposely not implemented

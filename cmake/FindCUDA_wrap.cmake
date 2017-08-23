@@ -37,12 +37,12 @@ endif ()
 set (CUDA_FOUND ${CUDA_FOUND} CACHE BOOL "Did we find cuda?")
 mark_as_advanced(CUDA_FOUND)
 
-IF(CUDA_FOUND)
-  IF(${CUDA_VERSION} LESS 3.2)
-    MESSAGE("CUDA version ${CUDA_VERSION} found, too old for RTK")
-    SET(CUDA_FOUND FALSE)
-  ENDIF()
-ENDIF()
+if(CUDA_FOUND)
+  if(${CUDA_VERSION} LESS 3.2)
+    message("CUDA version ${CUDA_VERSION} found, too old for RTK")
+    set(CUDA_FOUND FALSE)
+  endif()
+endif()
 
 if (CUDA_FOUND)
   cuda_include_directories (${CMAKE_CURRENT_SOURCE_DIR})
@@ -67,8 +67,16 @@ if("${CUDA_VERSION}" LESS 5.0)
      -gencode arch=compute_20,code=sm_20
      -gencode arch=compute_20,code=compute_20
     )
+elseif("${CUDA_VERSION}" LESS 8.0)
+ set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}
+     -gencode arch=compute_20,code=sm_20
+     -gencode arch=compute_30,code=sm_30
+     -gencode arch=compute_35,code=sm_35
+     -gencode arch=compute_35,code=compute_35
+     )
 else()
  set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}
+     -Wno-deprecated-gpu-targets
      -gencode arch=compute_20,code=sm_20
      -gencode arch=compute_30,code=sm_30
      -gencode arch=compute_35,code=sm_35
@@ -93,4 +101,4 @@ if(CUDA_FOUND)
         set(CUDA_HAVE_GPU FALSE CACHE BOOL "Whether CUDA-capable GPU is present")
     endif()
     mark_as_advanced(CUDA_HAVE_GPU)
-endif(CUDA_FOUND)
+endif()

@@ -16,10 +16,12 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkForwardWarpImageFilter_h
-#define __rtkForwardWarpImageFilter_h
+#ifndef rtkForwardWarpImageFilter_h
+#define rtkForwardWarpImageFilter_h
 
 #include <itkWarpImageFilter.h>
+
+#include "rtkMacro.h"
 
 namespace rtk
 {
@@ -68,7 +70,7 @@ protected:
   ForwardWarpImageFilter();
   ~ForwardWarpImageFilter() {}
 
-  virtual void GenerateData();
+  void GenerateData() ITK_OVERRIDE;
 
   // Redefine stuff that is private in the Superclass
   void Protected_EvaluateDisplacementAtPhysicalPoint(const PointType & p, DisplacementType &output);

@@ -16,8 +16,8 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkI0EstimationProjectionFilter_h
-#define __rtkI0EstimationProjectionFilter_h
+#ifndef rtkI0EstimationProjectionFilter_h
+#define rtkI0EstimationProjectionFilter_h
 
 #include <itkInPlaceImageFilter.h>
 #include <itkMutexLock.h>
@@ -70,17 +70,19 @@ public:
   itkConceptMacro(InputImagePixelTypeIsInteger, (itk::Concept::IsInteger<InputImagePixelType>) );
 
   /** Main Output: estimation result. */
-  itkGetMacro(I0, unsigned short)
-  itkGetMacro(I0fwhm, unsigned short)
-  itkGetMacro(I0rls, unsigned short)
+  itkGetMacro(I0, InputImagePixelType)
+  itkGetMacro(I0fwhm, InputImagePixelType)
+  itkGetMacro(I0rls, InputImagePixelType)
 
-  /** Maximum encodable detector value if different from (2^16-1) */
-  itkSetMacro(MaxPixelValue, unsigned short)
-  itkGetMacro(MaxPixelValue, unsigned short)
+  /** Maximum encodable detector value if different from (2^16-1). The default
+   * is the minimum between 2^24-1 and the numerical limit of the input pixel
+   * type. This allows to limit histogram size to 2^(24-bitShift)-1. */
+  itkSetMacro(MaxPixelValue, InputImagePixelType)
+  itkGetMacro(MaxPixelValue, InputImagePixelType)
 
   /** Expected I0 value (as a result of a detector calibration) */
-  itkSetMacro(ExpectedI0, unsigned short)
-  itkGetMacro(ExpectedI0, unsigned short)
+  itkSetMacro(ExpectedI0, InputImagePixelType)
+  itkGetMacro(ExpectedI0, InputImagePixelType)
 
   /** RSL estimate coefficient */
   itkSetMacro(Lambda, float)
@@ -100,47 +102,47 @@ public:
 
 protected:
   I0EstimationProjectionFilter();
-  virtual ~I0EstimationProjectionFilter() {}
+  ~I0EstimationProjectionFilter() {}
 
-  virtual void BeforeThreadedGenerateData();
+  void BeforeThreadedGenerateData() ITK_OVERRIDE;
 
-  virtual void ThreadedGenerateData(const OutputImageRegionType & outputRegionForThread, ThreadIdType threadId);
+  void ThreadedGenerateData(const OutputImageRegionType & outputRegionForThread, ThreadIdType threadId) ITK_OVERRIDE;
 
-  virtual void AfterThreadedGenerateData();
+  void AfterThreadedGenerateData() ITK_OVERRIDE;
 
 private:
   I0EstimationProjectionFilter(const Self &); //purposely not implemented
   void operator=(const Self &);               //purposely not implemented
 
   // Input variables
-  unsigned short m_ExpectedI0;            // Expected I0 value (as a result of a
+  InputImagePixelType m_ExpectedI0;       // Expected I0 value (as a result of a
                                           // detector calibration)
-  unsigned short m_MaxPixelValue;         // Maximum encodable detector value if
+  InputImagePixelType m_MaxPixelValue;    // Maximum encodable detector value if
                                           // different from (2^16-1)
   float          m_Lambda;                // RLS coefficient
   bool           m_SaveHistograms;        // Save histograms in a output file
   bool           m_Reset;                 // Reset counters
 
   // Secondary inputs
-  unsigned int m_NBins;                   // Histogram size, computed from 2^16
-                                          // and bitshift
+  std::vector<unsigned int>::size_type m_NBins; // Histogram size, computed
+                                                // from m_MaxPixelValue and bitshift
 
   // Main variables
-  std::vector< unsigned > m_Histogram;    // compressed (bitshifted) histogram
-  unsigned short          m_I0;           // I0 estimate with no a priori for
-                                          // each new image
-  unsigned short          m_I0rls;        // Updated RLS estimate
-  unsigned short          m_I0fwhm;       // FWHM of the I0 mode
+  std::vector< unsigned int > m_Histogram; // compressed (bitshifted) histogram
+  InputImagePixelType         m_I0;        // I0 estimate with no a priori for
+                                           // each new image
+  InputImagePixelType         m_I0rls;     // Updated RLS estimate
+  InputImagePixelType         m_I0fwhm;    // FWHM of the I0 mode
 
   // Secondary variables
-  unsigned int   m_Np;                    // Number of previously analyzed
+  unsigned int m_Np;                      // Number of previously analyzed
                                           // images
-  unsigned short m_Imin, m_Imax;          // Define the range of consistent
+  InputImagePixelType m_Imin, m_Imax;     // Define the range of consistent
                                           // pixels in histogram
-  unsigned       m_DynThreshold;          // Detector values with a frequency of
+  unsigned int m_DynThreshold;            // Detector values with a frequency of
                                           // less than dynThreshold outside
                                           // min/max are discarded
-  unsigned short m_LowBound, m_HighBound; // Lower/Upper bounds of the I0 mode
+  unsigned int m_LowBound, m_HighBound;   // Lower/Upper bounds of the I0 mode
                                           // at half width
 
   itk::MutexLock::Pointer m_Mutex;

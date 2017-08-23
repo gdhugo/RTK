@@ -16,8 +16,8 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkADMMTotalVariationConeBeamReconstructionFilter_hxx
-#define __rtkADMMTotalVariationConeBeamReconstructionFilter_hxx
+#ifndef rtkADMMTotalVariationConeBeamReconstructionFilter_hxx
+#define rtkADMMTotalVariationConeBeamReconstructionFilter_hxx
 
 #include "rtkADMMTotalVariationConeBeamReconstructionFilter.h"
 
@@ -75,6 +75,7 @@ ADMMTotalVariationConeBeamReconstructionFilter<TOutputImage, TGradientOutputImag
   m_ZeroMultiplyVolumeFilter->SetConstant2(itk::NumericTraits<typename TOutputImage::PixelType>::ZeroValue());
   m_ZeroMultiplyGradientFilter->SetConstant2(itk::NumericTraits<typename TOutputImage::PixelType>::ZeroValue());
   m_DisplacedDetectorFilter->SetPadOnTruncatedSide(false);
+  m_DisableDisplacedDetectorFilter = false;
 
   // Set memory management parameters
   m_ZeroMultiplyVolumeFilter->ReleaseDataFlagOn();
@@ -187,6 +188,8 @@ ADMMTotalVariationConeBeamReconstructionFilter<TOutputImage, TGradientOutputImag
     {
     m_DisplacedDetectorFilter->SetInput(this->GetInput(1));
     }
+  m_DisplacedDetectorFilter->SetDisable(m_DisableDisplacedDetectorFilter);
+  m_CGOperator->SetDisableDisplacedDetectorFilter(m_DisableDisplacedDetectorFilter);
 
   // Links with the m_BackProjectionFilter should be set here and not
   // in the constructor, as m_BackProjectionFilter is set at runtime

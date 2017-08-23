@@ -16,8 +16,8 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkADMMTotalVariationConeBeamReconstructionFilter_h
-#define __rtkADMMTotalVariationConeBeamReconstructionFilter_h
+#ifndef rtkADMMTotalVariationConeBeamReconstructionFilter_h
+#define rtkADMMTotalVariationConeBeamReconstructionFilter_h
 
 #include <itkImageToImageFilter.h>
 #include <itkAddImageFilter.h>
@@ -169,10 +169,10 @@ public:
     typedef rtk::MultiplyByVectorImageFilter<TOutputImage>                      GatingWeightsFilterType;
 
     /** Pass the ForwardProjection filter to the conjugate gradient operator */
-    void SetForwardProjectionFilter (int _arg);
+    void SetForwardProjectionFilter (int _arg) ITK_OVERRIDE;
 
     /** Pass the backprojection filter to the conjugate gradient operator and to the back projection filter generating the B of AX=B */
-    void SetBackProjectionFilter (int _arg);
+    void SetBackProjectionFilter (int _arg) ITK_OVERRIDE;
 
     /** Pass the geometry to all filters needing it */
     itkSetMacro(Geometry, ThreeDCircularProjectionGeometry::Pointer)
@@ -197,12 +197,16 @@ public:
 
     void PrintTiming(std::ostream& os) const;
 
+    /** Set / Get whether the displaced detector filter should be disabled */
+    itkSetMacro(DisableDisplacedDetectorFilter, bool)
+    itkGetMacro(DisableDisplacedDetectorFilter, bool)
+
 protected:
     ADMMTotalVariationConeBeamReconstructionFilter();
-    ~ADMMTotalVariationConeBeamReconstructionFilter(){}
+    ~ADMMTotalVariationConeBeamReconstructionFilter() {}
 
     /** Does the real work. */
-    virtual void GenerateData();
+    void GenerateData() ITK_OVERRIDE;
 
     /** Member pointers to the filters used internally (for convenience)*/
     typename SubtractGradientsFilterType::Pointer                               m_SubtractFilter1;
@@ -227,17 +231,18 @@ protected:
     /** The inputs of this filter have the same type (float, 3) but not the same meaning
     * It is normal that they do not occupy the same physical space. Therefore this check
     * must be removed */
-    void VerifyInputInformation(){}
+    void VerifyInputInformation() ITK_OVERRIDE {}
 
     /** The volume and the projections must have different requested regions
     */
-    void GenerateInputRequestedRegion();
-    void GenerateOutputInformation();
+    void GenerateInputRequestedRegion() ITK_OVERRIDE;
+    void GenerateOutputInformation() ITK_OVERRIDE;
 
     /** Have gating weights been set ? If so, apply them, otherwise ignore
      * the gating weights filter */
     bool                m_IsGated;
     std::vector<float>  m_GatingWeights;
+    bool                m_DisableDisplacedDetectorFilter;
 
 private:
     ADMMTotalVariationConeBeamReconstructionFilter(const Self &); //purposely not implemented

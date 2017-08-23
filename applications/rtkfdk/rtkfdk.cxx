@@ -30,13 +30,13 @@
 #  include "rtkCudaParkerShortScanImageFilter.h"
 #  include "rtkCudaFDKConeBeamReconstructionFilter.h"
 #endif
-#ifdef RTK_USE_OPENCL
-#  include "rtkOpenCLFDKConeBeamReconstructionFilter.h"
-#endif
 #include "rtkFDKWarpBackProjectionImageFilter.h"
 #include "rtkCyclicDeformationImageFilter.h"
 
 #include <itkStreamingImageFilter.h>
+#if ITK_VERSION_MAJOR > 4 || (ITK_VERSION_MAJOR == 4 && ITK_VERSION_MINOR >= 4)
+  #include <itkImageRegionSplitterDirection.h>
+#endif
 #include <itkImageFileWriter.h>
 
 int main(int argc, char * argv[])
@@ -89,13 +89,6 @@ int main(int argc, char * argv[])
     return EXIT_FAILURE;
     }
 #endif
-#ifndef RTK_USE_OPENCL
-   if(!strcmp(args_info.hardware_arg, "opencl") )
-     {
-     std::cerr << "The program has not been compiled with opencl option" << std::endl;
-     return EXIT_FAILURE;
-     }
-#endif
 
   // Displaced detector weighting
   typedef rtk::DisplacedDetectorImageFilter< OutputImageType >                     DDFCPUType;
@@ -112,6 +105,7 @@ int main(int argc, char * argv[])
     ddf = DDFOFFFOVType::New();
   ddf->SetInput( reader->GetOutput() );
   ddf->SetGeometry( geometryReader->GetOutputObject() );
+  ddf->SetDisable(args_info.nodisplaced_flag);
 
   // Short scan image filter
   typedef rtk::ParkerShortScanImageFilter< OutputImageType > PSSFCPUType;
@@ -164,15 +158,11 @@ int main(int argc, char * argv[])
   // FDK reconstruction filtering
   typedef rtk::FDKConeBeamReconstructionFilter< OutputImageType > FDKCPUType;
   FDKCPUType::Pointer feldkamp;
-#ifdef RTK_USE_OPENCL
-  typedef rtk::OpenCLFDKConeBeamReconstructionFilter FDKOPENCLType;
-  FDKOPENCLType::Pointer feldkampOCL;
-#endif
 #ifdef RTK_USE_CUDA
   typedef rtk::CudaFDKConeBeamReconstructionFilter FDKCUDAType;
   FDKCUDAType::Pointer feldkampCUDA;
 #endif
-  itk::Image< OutputPixelType, Dimension > *pfeldkamp = NULL;
+  itk::Image< OutputPixelType, Dimension > *pfeldkamp = ITK_NULLPTR;
   if(!strcmp(args_info.hardware_arg, "cpu") )
     {
     feldkamp = FDKCPUType::New();
@@ -202,27 +192,17 @@ int main(int argc, char * argv[])
     pfeldkamp = feldkampCUDA->GetOutput();
     }
 #endif
-#ifdef RTK_USE_OPENCL
-  else if(!strcmp(args_info.hardware_arg, "opencl") )
-    {
-    if(args_info.signal_given && args_info.dvf_given)
-      {
-      std::cerr << "Motion compensation is not supported in OpenCL. Aborting" << std::endl;
-      return EXIT_FAILURE;
-      }
-
-    feldkampOCL = FDKOPENCLType::New();
-    SET_FELDKAMP_OPTIONS( feldkampOCL );
-    pfeldkamp = feldkampOCL->GetOutput();
-    }
-#endif
-
 
   // Streaming depending on streaming capability of writer
   typedef itk::StreamingImageFilter<CPUOutputImageType, CPUOutputImageType> StreamerType;
   StreamerType::Pointer streamerBP = StreamerType::New();
   streamerBP->SetInput( pfeldkamp );
   streamerBP->SetNumberOfStreamDivisions( args_info.divisions_arg );
+#if ITK_VERSION_MAJOR > 4 || (ITK_VERSION_MAJOR == 4 && ITK_VERSION_MINOR >= 4)
+  itk::ImageRegionSplitterDirection::Pointer splitter = itk::ImageRegionSplitterDirection::New();
+  splitter->SetDirection(2); // Prevent splitting along z axis. As a result, splitting will be performed along y axis
+  streamerBP->SetRegionSplitter(splitter);
+#endif
 
   // Write
   typedef itk::ImageFileWriter<CPUOutputImageType> WriterType;
@@ -235,7 +215,7 @@ int main(int argc, char * argv[])
   itk::TimeProbe writerProbe;
 
   writerProbe.Start();
-  TRY_AND_EXIT_ON_ITK_EXCEPTION( writer->Update() );
+  TRY_AND_EXIT_ON_ITK_EXCEPTION( writer->Update() )
   writerProbe.Stop();
 
   if(args_info.verbose_flag)
@@ -246,10 +226,6 @@ int main(int argc, char * argv[])
 #ifdef RTK_USE_CUDA
     else if(!strcmp(args_info.hardware_arg, "cuda") )
       feldkampCUDA->PrintTiming(std::cout);
-#endif
-#ifdef RTK_USE_OPENCL
-    else if(!strcmp(args_info.hardware_arg, "opencl") )
-      feldkampOCL->PrintTiming(std::cout);
 #endif
     std::cout << std::endl;
     }

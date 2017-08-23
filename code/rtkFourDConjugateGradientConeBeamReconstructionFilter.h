@@ -16,8 +16,8 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkFourDConjugateGradientConeBeamReconstructionFilter_h
-#define __rtkFourDConjugateGradientConeBeamReconstructionFilter_h
+#ifndef rtkFourDConjugateGradientConeBeamReconstructionFilter_h
+#define rtkFourDConjugateGradientConeBeamReconstructionFilter_h
 
 #include "rtkBackProjectionImageFilter.h"
 #include "rtkForwardProjectionImageFilter.h"
@@ -25,9 +25,11 @@
 #include "rtkConjugateGradientImageFilter.h"
 #include "rtkFourDReconstructionConjugateGradientOperator.h"
 #include "rtkProjectionStackToFourDImageFilter.h"
+#include "rtkDisplacedDetectorImageFilter.h"
 
 #include <itkExtractImageFilter.h>
 #include <itkSubtractImageFilter.h>
+#include <itkMultiplyImageFilter.h>
 #include <itkTimeProbe.h>
 #ifdef RTK_USE_CUDA
   #include "rtkCudaConjugateGradientImageFilter_4f.h"
@@ -71,11 +73,13 @@ namespace rtk
    * AfterInput0 [label="", fixedsize="false", width=0, height=0, shape=none];
    * ConjugateGradient [ label="rtk::ConjugateGradientImageFilter" URL="\ref rtk::ConjugateGradientImageFilter"];
    * PSTFD [ label="rtk::ProjectionStackToFourDImageFilter" URL="\ref rtk::ProjectionStackToFourDImageFilter"];
+   * Displaced [ label="rtk::DisplacedDetectorImageFilter" URL="\ref rtk::DisplacedDetectorImageFilter"];
    *
    * Input0 -> AfterInput0 [arrowhead=none];
    * AfterInput0 -> ConjugateGradient;
    * Input0 -> PSTFD;
-   * Input1 -> PSTFD;
+   * Input1 -> Displaced;
+   * Displaced -> PSTFD;
    * PSTFD -> ConjugateGradient;
    * ConjugateGradient -> Output;
    * }
@@ -110,6 +114,7 @@ public:
   typedef rtk::ConjugateGradientImageFilter<VolumeSeriesType>                                       ConjugateGradientFilterType;
   typedef rtk::FourDReconstructionConjugateGradientOperator<VolumeSeriesType, ProjectionStackType>  CGOperatorFilterType;
   typedef rtk::ProjectionStackToFourDImageFilter<VolumeSeriesType, ProjectionStackType>             ProjStackToFourDFilterType;
+  typedef rtk::DisplacedDetectorImageFilter<ProjectionStackType>                                    DisplacedDetectorFilterType;
 
   /** Standard New method. */
   itkNewMacro(Self)
@@ -135,32 +140,38 @@ public:
   void SetInputVolumeSeries(const VolumeSeriesType* VolumeSeries);
   typename VolumeSeriesType::ConstPointer GetInputVolumeSeries();
 
-  /** Set/Get the stack of projections  */
-  void SetInputProjectionStack(const VolumeType* Projection);
-  typename VolumeType::ConstPointer GetInputProjectionStack();
+  /** Set/Get the stack of projections */
+  void SetInputProjectionStack(const ProjectionStackType* Projections);
+  typename ProjectionStackType::ConstPointer GetInputProjectionStack();
 
   /** Pass the ForwardProjection filter to the conjugate gradient operator */
-  void SetForwardProjectionFilter (int _arg);
+  void SetForwardProjectionFilter (int _arg) ITK_OVERRIDE;
 
   /** Pass the backprojection filter to the conjugate gradient operator and to the filter generating the B of AX=B */
-  void SetBackProjectionFilter (int _arg);
+  void SetBackProjectionFilter (int _arg) ITK_OVERRIDE;
 
   /** Pass the interpolation weights to subfilters */
   void SetWeights(const itk::Array2D<float> _arg);
 
+  /** Store the phase signal in a member variable */
+  virtual void SetSignal(const std::vector<double> signal);
+
+  /** Set / Get whether the displaced detector filter should be disabled */
+  itkSetMacro(DisableDisplacedDetectorFilter, bool)
+  itkGetMacro(DisableDisplacedDetectorFilter, bool)
 protected:
   FourDConjugateGradientConeBeamReconstructionFilter();
-  ~FourDConjugateGradientConeBeamReconstructionFilter(){}
+  ~FourDConjugateGradientConeBeamReconstructionFilter() {}
 
-  virtual void GenerateOutputInformation();
+  void GenerateOutputInformation() ITK_OVERRIDE;
 
-  virtual void GenerateInputRequestedRegion();
+  void GenerateInputRequestedRegion() ITK_OVERRIDE;
 
-  virtual void GenerateData();
+  void GenerateData() ITK_OVERRIDE;
 
   /** The two inputs should not be in the same space so there is nothing
    * to verify. */
-  virtual void VerifyInputInformation() {}
+  void VerifyInputInformation() ITK_OVERRIDE {}
 
   /** Pointers to each subfilter of this composite filter */
   typename ForwardProjectionFilterType::Pointer     m_ForwardProjectionFilter;
@@ -169,8 +180,11 @@ protected:
   typename ConjugateGradientFilterType::Pointer     m_ConjugateGradientFilter;
   typename CGOperatorFilterType::Pointer            m_CGOperator;
   typename ProjStackToFourDFilterType::Pointer      m_ProjStackToFourDFilter;
+  typename DisplacedDetectorFilterType::Pointer     m_DisplacedDetectorFilter;
 
-  bool m_CudaConjugateGradient;
+  bool                    m_CudaConjugateGradient;
+  std::vector<double>     m_Signal;
+  bool                    m_DisableDisplacedDetectorFilter;
 
 private:
   //purposely not implemented

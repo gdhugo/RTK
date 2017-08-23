@@ -15,8 +15,8 @@
  *  limitations under the License.
  *
  *=========================================================================*/
-#ifndef __rtkFourDToProjectionStackImageFilter_h
-#define __rtkFourDToProjectionStackImageFilter_h
+#ifndef rtkFourDToProjectionStackImageFilter_h
+#define rtkFourDToProjectionStackImageFilter_h
 
 #include <itkExtractImageFilter.h>
 #include <itkPasteImageFilter.h>
@@ -140,19 +140,22 @@ public:
     /** Initializes the empty volume source, set it and update it */
     void InitializeConstantVolumeSource();
 
+    /** Store the phase signal in a member variable */
+    virtual void SetSignal(const std::vector<double> signal);
+
 protected:
     FourDToProjectionStackImageFilter();
-    ~FourDToProjectionStackImageFilter(){}
+    ~FourDToProjectionStackImageFilter() {}
 
     typename VolumeSeriesType::ConstPointer GetInputVolumeSeries();
     typename ProjectionStackType::Pointer GetInputProjectionStack();
 
     /** Does the real work. */
-    virtual void GenerateData();
+    void GenerateData() ITK_OVERRIDE;
 
-    virtual void GenerateOutputInformation();
+    void GenerateOutputInformation() ITK_OVERRIDE;
 
-    virtual void GenerateInputRequestedRegion();
+    void GenerateInputRequestedRegion() ITK_OVERRIDE;
 
     /** Member pointers to the filters used internally (for convenience)*/
     typename PasteFilterType::Pointer                       m_PasteFilter;
@@ -164,8 +167,8 @@ protected:
     /** Other member variables */
     itk::Array2D<float>                                                 m_Weights;
     GeometryType::Pointer                                               m_Geometry;
-    int                                                                 m_ProjectionNumber;
     typename ConstantProjectionStackSourceType::OutputImageRegionType   m_PasteRegion;
+    std::vector<double>                                                 m_Signal;
 
 private:
     FourDToProjectionStackImageFilter(const Self &); //purposely not implemented

@@ -16,8 +16,8 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkUnwarpSequenceConjugateGradientOperator_h
-#define __rtkUnwarpSequenceConjugateGradientOperator_h
+#ifndef rtkUnwarpSequenceConjugateGradientOperator_h
+#define rtkUnwarpSequenceConjugateGradientOperator_h
 
 #include "rtkWarpSequenceImageFilter.h"
 #include "rtkConjugateGradientOperator.h"
@@ -55,12 +55,12 @@ namespace rtk
    */
 
   template< typename TImageSequence,
-            typename TMVFImageSequence = itk::Image< itk::CovariantVector < typename TImageSequence::ValueType,
+            typename TDVFImageSequence = itk::Image< itk::CovariantVector < typename TImageSequence::ValueType,
                                                                             TImageSequence::ImageDimension-1 >,
                                                      TImageSequence::ImageDimension >,
             typename TImage = itk::Image< typename TImageSequence::ValueType,
                                           TImageSequence::ImageDimension-1 >,
-            typename TMVFImage = itk::Image<itk::CovariantVector < typename TImageSequence::ValueType,
+            typename TDVFImage = itk::Image<itk::CovariantVector < typename TImageSequence::ValueType,
                                                                    TImageSequence::ImageDimension - 1 >,
                                             TImageSequence::ImageDimension - 1> >
 class UnwarpSequenceConjugateGradientOperator : public ConjugateGradientOperator< TImageSequence >
@@ -77,13 +77,13 @@ public:
     /** Run-time type information (and related methods). */
     itkTypeMacro(rtkUnwarpSequenceConjugateGradientOperator, ConjugateGradientOperator)
 
-    typedef rtk::WarpSequenceImageFilter<TImageSequence, TMVFImageSequence, TImage, TMVFImage> WarpSequenceFilterType;
+    typedef rtk::WarpSequenceImageFilter<TImageSequence, TDVFImageSequence, TImage, TDVFImage> WarpSequenceFilterType;
 
     /** Set the motion vector field used in input 1 */
-    void SetDisplacementField(const TMVFImageSequence* MVFs);
+    void SetDisplacementField(const TDVFImageSequence* DVFs);
 
     /** Get the motion vector field used in input 1 */
-    typename TMVFImageSequence::Pointer GetDisplacementField();
+    typename TDVFImageSequence::Pointer GetDisplacementField();
 
     /** Phase shift to simulate phase estimation errors */
     itkSetMacro(PhaseShift, float)
@@ -92,12 +92,16 @@ public:
     itkSetMacro(UseNearestNeighborInterpolationInWarping, bool)
     itkGetMacro(UseNearestNeighborInterpolationInWarping, bool)
 
+    /** Set and Get for the UseCudaCyclicDeformation variable */
+    itkSetMacro(UseCudaCyclicDeformation, bool)
+    itkGetMacro(UseCudaCyclicDeformation, bool)
+
 protected:
     UnwarpSequenceConjugateGradientOperator();
-    ~UnwarpSequenceConjugateGradientOperator(){}
+    ~UnwarpSequenceConjugateGradientOperator() {}
 
     /** Does the real work. */
-    virtual void GenerateData();
+    void GenerateData() ITK_OVERRIDE;
 
     /** Member pointers to the filters used internally (for convenience)*/
     typename WarpSequenceFilterType::Pointer              m_WarpSequenceBackwardFilter;
@@ -109,12 +113,14 @@ protected:
     /** When the inputs have the same type, ITK checks whether they occupy the
     * same physical space or not. Obviously they dont, so we have to remove this check
     */
-    void VerifyInputInformation(){}
+    void VerifyInputInformation() ITK_OVERRIDE {}
 
     /** The volume and the projections must have different requested regions
     */
-    void GenerateInputRequestedRegion();
-    void GenerateOutputInformation();
+    void GenerateInputRequestedRegion() ITK_OVERRIDE;
+    void GenerateOutputInformation() ITK_OVERRIDE;
+
+    bool m_UseCudaCyclicDeformation;
 
 private:
     UnwarpSequenceConjugateGradientOperator(const Self &); //purposely not implemented

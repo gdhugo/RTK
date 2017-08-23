@@ -15,8 +15,8 @@
  *  limitations under the License.
  *
  *=========================================================================*/
-#ifndef __rtkRegularizedConjugateGradientConeBeamReconstructionFilter_hxx
-#define __rtkRegularizedConjugateGradientConeBeamReconstructionFilter_hxx
+#ifndef rtkRegularizedConjugateGradientConeBeamReconstructionFilter_hxx
+#define rtkRegularizedConjugateGradientConeBeamReconstructionFilter_hxx
 
 #include "rtkRegularizedConjugateGradientConeBeamReconstructionFilter.h"
 
@@ -28,7 +28,11 @@ RegularizedConjugateGradientConeBeamReconstructionFilter<TImage>::RegularizedCon
 {
   // Set the default values of member parameters
   m_GammaTV = 0.00005;
+  m_Gamma = 0; // Laplacian regularization
   m_SoftThresholdWavelets = 0.001;
+  m_SoftThresholdOnImage = 0.001;
+  m_Preconditioned = false;
+  m_RegularizedCG = false;
 
   m_TV_iterations=10;
   m_MainLoop_iterations=10;
@@ -38,6 +42,7 @@ RegularizedConjugateGradientConeBeamReconstructionFilter<TImage>::RegularizedCon
   m_PerformPositivity = true;
   m_PerformTVSpatialDenoising = true;
   m_PerformWaveletsSpatialDenoising = false;
+  m_PerformSoftThresholdOnImage= false;
 
   // Dimensions processed for TV, default is all
   for (unsigned int i=0; i<TImage::ImageDimension; i++)
@@ -47,12 +52,15 @@ RegularizedConjugateGradientConeBeamReconstructionFilter<TImage>::RegularizedCon
   m_CudaConjugateGradient = true; // 3D volumes of usual size fit on GPUs
   m_Order = 5;
   m_NumberOfLevels = 3;
+  m_DisableDisplacedDetectorFilter = false;
+  m_IterationCosts = false;
 
   // Create the filters
   m_CGFilter = CGFilterType::New();
   m_PositivityFilter = ThresholdFilterType::New();
   m_TVDenoising = TVDenoisingFilterType::New();
   m_WaveletsDenoising = WaveletsDenoisingFilterType::New();
+  m_SoftThresholdFilter = SoftThresholdFilterType::New();
 }
 
 template< typename TImage >
@@ -77,6 +85,14 @@ RegularizedConjugateGradientConeBeamReconstructionFilter<TImage>
 ::SetInputWeights(const TImage* Weights)
 {
   this->SetInput("Weights", const_cast<TImage*>(Weights));
+}
+
+template< typename TOutputImage>
+void
+RegularizedConjugateGradientConeBeamReconstructionFilter<TOutputImage>::
+SetSupportMask(const TOutputImage *SupportMask)
+{
+  this->SetInput("SupportMask", const_cast<TOutputImage*>(SupportMask));
 }
 
 template< typename TImage >
@@ -104,6 +120,15 @@ RegularizedConjugateGradientConeBeamReconstructionFilter<TImage>
 {
   return static_cast< TImage * >
           ( this->itk::ProcessObject::GetInput("Weights") );
+}
+
+template< typename TOutputImage>
+typename TOutputImage::ConstPointer
+RegularizedConjugateGradientConeBeamReconstructionFilter<TOutputImage>::
+GetSupportMask()
+{
+  return static_cast< const TOutputImage * >
+          ( this->itk::ProcessObject::GetInput("SupportMask") );
 }
 
 template< typename TImage >
@@ -157,11 +182,14 @@ RegularizedConjugateGradientConeBeamReconstructionFilter<TImage>
   m_CGFilter->SetInput(0, this->GetInputVolume());
   m_CGFilter->SetInput(1, this->GetInputProjectionStack());
   m_CGFilter->SetInput(2, this->GetInputWeights());
+  m_CGFilter->SetSupportMask(this->GetSupportMask());
   m_CGFilter->SetGeometry(this->m_Geometry);
   m_CGFilter->SetNumberOfIterations(this->m_CG_iterations);
-  m_CGFilter->SetPreconditioned(m_Preconditioned);
   m_CGFilter->SetCudaConjugateGradient(this->GetCudaConjugateGradient());
   m_CGFilter->SetRegularized(this->m_RegularizedCG);
+  m_CGFilter->SetGamma(this->m_Gamma);
+  m_CGFilter->SetIterationCosts(m_IterationCosts);
+  m_CGFilter->SetDisableDisplacedDetectorFilter(m_DisableDisplacedDetectorFilter);
 
   currentDownstreamFilter = m_CGFilter;
 
@@ -199,6 +227,16 @@ RegularizedConjugateGradientConeBeamReconstructionFilter<TImage>
     m_WaveletsDenoising->SetNumberOfLevels(m_NumberOfLevels);
 
     currentDownstreamFilter = m_WaveletsDenoising;
+    }
+
+  if (m_PerformSoftThresholdOnImage)
+    {
+    currentDownstreamFilter->ReleaseDataFlagOn();
+
+    m_SoftThresholdFilter->SetInput(currentDownstreamFilter->GetOutput());
+    m_SoftThresholdFilter->SetThreshold(m_SoftThresholdOnImage);
+
+    currentDownstreamFilter = m_SoftThresholdFilter;
     }
 
   // Have the last filter calculate its output information
@@ -263,6 +301,15 @@ RegularizedConjugateGradientConeBeamReconstructionFilter<TImage>
 
       currentDownstreamFilter = m_WaveletsDenoising;
       }
+
+    if (m_PerformSoftThresholdOnImage)
+      {
+      m_SoftThresholdImageProbe.Start();
+      m_SoftThresholdFilter->Update();
+      m_SoftThresholdImageProbe.Stop();
+
+      currentDownstreamFilter = m_SoftThresholdFilter;
+      }
     }
 
   this->GraftOutput( currentDownstreamFilter->GetOutput() );
@@ -274,7 +321,7 @@ RegularizedConjugateGradientConeBeamReconstructionFilter<TImage>
 ::PrintTiming(std::ostream& os) const
 {
   os << "RegularizedConjugateGradientConeBeamReconstructionFilter timing:" << std::endl;
-  os << "  4D conjugate gradient reconstruction: " << m_CGProbe.GetTotal()
+  os << "  3D conjugate gradient reconstruction: " << m_CGProbe.GetTotal()
      << ' ' << m_CGProbe.GetUnit() << std::endl;
   if (m_PerformPositivity)
     {
@@ -290,6 +337,11 @@ RegularizedConjugateGradientConeBeamReconstructionFilter<TImage>
     {
     os << "  Wavelets spatial denoising: " << m_WaveletsSpatialDenoisingProbe.GetTotal()
       << ' ' << m_WaveletsSpatialDenoisingProbe.GetUnit() << std::endl;
+    }
+  if (m_PerformSoftThresholdOnImage)
+    {
+    os << "  Soft thresholding in image domain: " << m_SoftThresholdImageProbe.GetTotal()
+      << ' ' << m_SoftThresholdImageProbe.GetUnit() << std::endl;
     }
 }
 

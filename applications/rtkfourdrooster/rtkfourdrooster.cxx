@@ -21,7 +21,8 @@
 
 #include "rtkFourDROOSTERConeBeamReconstructionFilter.h"
 #include "rtkThreeDCircularProjectionGeometryXMLFile.h"
-#include "rtkPhasesToInterpolationWeights.h"
+#include "rtkSignalToInterpolationWeights.h"
+#include "rtkReorderProjectionsImageFilter.h"
 
 #ifdef RTK_USE_CUDA
   #include "itkCudaImage.h"
@@ -92,32 +93,48 @@ int main(int argc, char * argv[])
 
     inputFilter = constantImageSource;
     }
-  inputFilter->Update();
+  TRY_AND_EXIT_ON_ITK_EXCEPTION( inputFilter->Update() )
   inputFilter->ReleaseDataFlagOn();
 
-  // Read the phases file
-  rtk::PhasesToInterpolationWeights::Pointer phaseReader = rtk::PhasesToInterpolationWeights::New();
-  phaseReader->SetFileName(args_info.signal_arg);
-  phaseReader->SetNumberOfReconstructedFrames(inputFilter->GetOutput()->GetLargestPossibleRegion().GetSize(3));
-  phaseReader->Update();
-  
+  // Re-order geometry and projections
+  // In the new order, projections with identical phases are packed together
+  std::vector<double> signal = rtk::ReadSignalFile(args_info.signal_arg);
+  typedef rtk::ReorderProjectionsImageFilter<ProjectionStackType> ReorderProjectionsFilterType;
+  ReorderProjectionsFilterType::Pointer reorder = ReorderProjectionsFilterType::New();
+  reorder->SetInput(reader->GetOutput());
+  reorder->SetInputGeometry(geometryReader->GetOutputObject());
+  reorder->SetInputSignal(signal);
+  TRY_AND_EXIT_ON_ITK_EXCEPTION( reorder->Update() )
+
+  // Release the memory holding the stack of original projections
+  reader->GetOutput()->ReleaseData();
+
+  // Compute the interpolation weights
+  rtk::SignalToInterpolationWeights::Pointer signalToInterpolationWeights = rtk::SignalToInterpolationWeights::New();
+  signalToInterpolationWeights->SetSignal(reorder->GetOutputSignal());
+  signalToInterpolationWeights->SetNumberOfReconstructedFrames(inputFilter->GetOutput()->GetLargestPossibleRegion().GetSize(3));
+  TRY_AND_EXIT_ON_ITK_EXCEPTION( signalToInterpolationWeights->Update() )
   
   // Create the 4DROOSTER filter, connect the basic inputs, and set the basic parameters
+  // Also set the forward and back projection filters to be used
   typedef rtk::FourDROOSTERConeBeamReconstructionFilter<VolumeSeriesType, ProjectionStackType> ROOSTERFilterType;
   ROOSTERFilterType::Pointer rooster = ROOSTERFilterType::New();
+  rooster->SetForwardProjectionFilter(args_info.fp_arg);
+  rooster->SetBackProjectionFilter(args_info.bp_arg);
   rooster->SetInputVolumeSeries(inputFilter->GetOutput() );
-  rooster->SetInputProjectionStack(reader->GetOutput());
-  rooster->SetGeometry( geometryReader->GetOutputObject() );
-  rooster->SetWeights(phaseReader->GetOutput());
   rooster->SetCG_iterations( args_info.cgiter_arg );
   rooster->SetMainLoop_iterations( args_info.niter_arg );
   rooster->SetPhaseShift(args_info.shift_arg);
   rooster->SetCudaConjugateGradient(args_info.cudacg_flag);
+  rooster->SetUseCudaCyclicDeformation(args_info.cudadvfinterpolation_flag);
+  rooster->SetDisableDisplacedDetectorFilter(args_info.nodisplaced_flag);
   
-  //Set the forward and back projection filters to be used
-  rooster->SetForwardProjectionFilter(args_info.fp_arg);
-  rooster->SetBackProjectionFilter(args_info.bp_arg);
-  
+  // Set the newly ordered arguments
+  rooster->SetInputProjectionStack( reorder->GetOutput() );
+  rooster->SetGeometry( reorder->GetOutputGeometry() );
+  rooster->SetWeights(signalToInterpolationWeights->GetOutput());
+  rooster->SetSignal(reorder->GetOutputSignal());
+
   // For each optional regularization step, set whether or not
   // it should be performed, and provide the necessary inputs
   
@@ -133,7 +150,7 @@ int main(int argc, char * argv[])
     {
     InputReaderType::Pointer motionMaskReader = InputReaderType::New();
     motionMaskReader->SetFileName( args_info.motionmask_arg );
-    motionMaskReader->Update();
+    TRY_AND_EXIT_ON_ITK_EXCEPTION( motionMaskReader->Update() )
     rooster->SetMotionMask(motionMaskReader->GetOutput());
     rooster->SetPerformMotionMask(true);
     }
@@ -172,7 +189,7 @@ int main(int argc, char * argv[])
     rooster->SetPerformTVTemporalDenoising(false);
 
   // Temporal L0
-  if (args_info.lambda_time_arg)
+  if (args_info.lambda_time_given)
     {
     rooster->SetLambdaL0Time(args_info.lambda_time_arg);
     rooster->SetL0_iterations(args_info.l0iter_arg);
@@ -181,6 +198,17 @@ int main(int argc, char * argv[])
   else
     rooster->SetPerformL0TemporalDenoising(false);
 
+  // Total nuclear variation
+  if (args_info.gamma_tnv_given)
+    {
+    rooster->SetGammaTNV(args_info.gamma_tnv_arg);
+    rooster->SetTV_iterations(args_info.tviter_arg);
+    rooster->SetPerformTNVDenoising(true);
+    }
+  else
+    rooster->SetPerformTNVDenoising(false);
+
+  // Warping
   if (args_info.dvf_given)
     {
     rooster->SetPerformWarping(true);
@@ -191,7 +219,7 @@ int main(int argc, char * argv[])
     // Read DVF
     DVFReaderType::Pointer dvfReader = DVFReaderType::New();
     dvfReader->SetFileName( args_info.dvf_arg );
-    dvfReader->Update();
+    TRY_AND_EXIT_ON_ITK_EXCEPTION( dvfReader->Update() )
     rooster->SetDisplacementField(dvfReader->GetOutput());
 
     if (args_info.idvf_given)
@@ -201,7 +229,7 @@ int main(int argc, char * argv[])
       // Read inverse DVF if provided
       DVFReaderType::Pointer idvfReader = DVFReaderType::New();
       idvfReader->SetFileName( args_info.idvf_arg );
-      idvfReader->Update();
+      TRY_AND_EXIT_ON_ITK_EXCEPTION( idvfReader->Update() )
       rooster->SetInverseDisplacementField(idvfReader->GetOutput());
       }
     }
@@ -213,21 +241,21 @@ int main(int argc, char * argv[])
     readerProbe.Start();
     }
 
-  TRY_AND_EXIT_ON_ITK_EXCEPTION( rooster->Update() );
+  TRY_AND_EXIT_ON_ITK_EXCEPTION( rooster->Update() )
 
-  if(args_info.time_flag)
-    {
-    rooster->PrintTiming(std::cout);
-    readerProbe.Stop();
-    std::cout << "It took...  " << readerProbe.GetMean() << ' ' << readerProbe.GetUnit() << std::endl;
-    }
+//  if(args_info.time_flag)
+//    {
+//    rooster->PrintTiming(std::cout);
+//    readerProbe.Stop();
+//    std::cout << "It took...  " << readerProbe.GetMean() << ' ' << readerProbe.GetUnit() << std::endl;
+//    }
 
   // Write
   typedef itk::ImageFileWriter< VolumeSeriesType > WriterType;
   WriterType::Pointer writer = WriterType::New();
   writer->SetFileName( args_info.output_arg );
   writer->SetInput( rooster->GetOutput() );
-  TRY_AND_EXIT_ON_ITK_EXCEPTION( writer->Update() );
+  TRY_AND_EXIT_ON_ITK_EXCEPTION( writer->Update() )
 
   return EXIT_SUCCESS;
 }

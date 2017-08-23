@@ -16,8 +16,8 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkADMMTotalVariationConjugateGradientOperator_h
-#define __rtkADMMTotalVariationConjugateGradientOperator_h
+#ifndef rtkADMMTotalVariationConjugateGradientOperator_h
+#define rtkADMMTotalVariationConjugateGradientOperator_h
 
 #include <itkMultiplyImageFilter.h>
 #include <itkSubtractImageFilter.h>
@@ -148,12 +148,16 @@ public:
     /** In the case of a gated reconstruction, set the gating weights */
     void SetGatingWeights(std::vector<float> weights);
 
+    /** Set / Get whether the displaced detector filter should be disabled */
+    itkSetMacro(DisableDisplacedDetectorFilter, bool)
+    itkGetMacro(DisableDisplacedDetectorFilter, bool)
+
 protected:
     ADMMTotalVariationConjugateGradientOperator();
-    ~ADMMTotalVariationConjugateGradientOperator(){}
+    ~ADMMTotalVariationConjugateGradientOperator() {}
 
     /** Does the real work. */
-    virtual void GenerateData();
+    void GenerateData() ITK_OVERRIDE;
 
     /** Member pointers to the filters used internally (for convenience)*/
     BackProjectionFilterPointer            m_BackProjectionFilter;
@@ -170,6 +174,7 @@ protected:
 
     ThreeDCircularProjectionGeometry::Pointer         m_Geometry;
     float                                             m_Beta;
+    bool                                              m_DisableDisplacedDetectorFilter;
 
     /** Have gating weights been set ? If so, apply them, otherwise ignore
      * the gating weights filter */
@@ -179,12 +184,12 @@ protected:
     /** When the inputs have the same type, ITK checks whether they occupy the
     * same physical space or not. Obviously they dont, so we have to remove this check
     */
-    void VerifyInputInformation(){}
+    void VerifyInputInformation() ITK_OVERRIDE {}
 
     /** The volume and the projections must have different requested regions
     */
-    void GenerateInputRequestedRegion();
-    void GenerateOutputInformation();
+    void GenerateInputRequestedRegion() ITK_OVERRIDE;
+    void GenerateOutputInformation() ITK_OVERRIDE;
 
 private:
     ADMMTotalVariationConjugateGradientOperator(const Self &); //purposely not implemented

@@ -16,11 +16,12 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkRayCastInterpolatorForwardProjectionImageFilter_hxx
-#define __rtkRayCastInterpolatorForwardProjectionImageFilter_hxx
+#ifndef rtkRayCastInterpolatorForwardProjectionImageFilter_hxx
+#define rtkRayCastInterpolatorForwardProjectionImageFilter_hxx
 
 #include "rtkHomogeneousMatrix.h"
 #include "rtkRayCastInterpolateImageFunction.h"
+#include "rtkProjectionsRegionConstIteratorRayBased.h"
 
 #include <itkImageRegionConstIterator.h>
 #include <itkImageRegionIteratorWithIndex.h>
@@ -37,7 +38,6 @@ RayCastInterpolatorForwardProjectionImageFilter<TInputImage,TOutputImage>
                        ThreadIdType itkNotUsed(threadId) )
 {
   const unsigned int Dimension = TInputImage::ImageDimension;
-  const unsigned int nPixelPerProj = outputRegionForThread.GetSize(0)*outputRegionForThread.GetSize(1);
   const typename Superclass::GeometryPointer geometry = this->GetGeometry();
 
   // Create interpolator
@@ -46,12 +46,6 @@ RayCastInterpolatorForwardProjectionImageFilter<TInputImage,TOutputImage>
   interpolator->SetThreshold( itk::NumericTraits< double >::NonpositiveMin() );
   interpolator->SetInputImage( this->GetInput(1) );
   interpolator->SetTransform(itk::IdentityTransform<double,3>::New());
-
-  // Iterators on volume input and output
-  typedef itk::ImageRegionConstIterator<TInputImage> InputRegionIterator;
-  InputRegionIterator itIn(this->GetInput(), outputRegionForThread);
-  typedef itk::ImageRegionIteratorWithIndex<TOutputImage> OutputRegionIterator;
-  OutputRegionIterator itOut(this->GetOutput(), outputRegionForThread);
 
   // Get inverse volume direction in an homogeneous matrix
   itk::Matrix<double, Dimension, Dimension> volDirInvNotHom;
@@ -81,37 +75,26 @@ RayCastInterpolatorForwardProjectionImageFilter<TInputImage,TOutputImage>
   typename Superclass::GeometryType::ThreeDHomogeneousMatrixType volMatrix;
   volMatrix = volRayCastOrigin * volDirectionInv * volOriginInv;
 
-  // Go over each projection
-  for(unsigned int iProj=outputRegionForThread.GetIndex(2);
-                   iProj<outputRegionForThread.GetIndex(2)+outputRegionForThread.GetSize(2);
-                   iProj++)
+  // Iterators on volume input and output
+  typedef ProjectionsRegionConstIteratorRayBased<TInputImage> InputRegionIterator;
+  InputRegionIterator *itIn;
+  itIn = InputRegionIterator::New(this->GetInput(),
+                                  outputRegionForThread,
+                                  geometry,
+                                  volMatrix);
+  typedef itk::ImageRegionIteratorWithIndex<TOutputImage> OutputRegionIterator;
+  OutputRegionIterator itOut(this->GetOutput(), outputRegionForThread);
+
+  // Go over each projection pixel
+  for(unsigned int pix=0; pix<outputRegionForThread.GetNumberOfPixels(); pix++, itIn->Next(), ++itOut)
     {
     // Compute source position and change coordinate system
-    typename Superclass::GeometryType::HomogeneousVectorType sourcePosition;
-    sourcePosition = volMatrix * geometry->GetSourcePosition(iProj);
-    interpolator->SetFocalPoint( &sourcePosition[0] );
+    interpolator->SetFocalPoint( &(itIn->GetSourcePosition()[0]) );
 
-    // Compute matrix to transform projection index to volume coordinates
-    typename Superclass::GeometryType::ThreeDHomogeneousMatrixType matrix;
-    matrix = volMatrix.GetVnlMatrix() *
-             geometry->GetProjectionCoordinatesToFixedSystemMatrix(iProj).GetVnlMatrix() *
-             GetIndexToPhysicalPointMatrix( this->GetOutput() ).GetVnlMatrix();
-
-    // Go over each pixel of the projection
-    typename TInputImage::PointType point;
-    for(unsigned int pix=0; pix<nPixelPerProj; pix++, ++itIn, ++itOut)
-      {
-      // Compute point coordinate in volume depending on projection index
-      for(unsigned int i=0; i<Dimension; i++)
-        {
-        point[i] = matrix[i][Dimension];
-        for(unsigned int j=0; j<Dimension; j++)
-          point[i] += matrix[i][j] * itOut.GetIndex()[j];
-        }
-
-      itOut.Set( itIn.Get() + interpolator->Evaluate(point) );
-      }
+    itOut.Set( itIn->Get() + interpolator->Evaluate( &(itIn->GetPixelPosition()[0]) ) );
     }
+
+  delete itIn;
 }
 
 } // end namespace rtk

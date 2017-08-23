@@ -16,13 +16,15 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkFieldOfViewImageFilter_hxx
-#define __rtkFieldOfViewImageFilter_hxx
+#ifndef rtkFieldOfViewImageFilter_hxx
+#define rtkFieldOfViewImageFilter_hxx
 
 #include <itkImageRegionConstIterator.h>
 #include <itkImageRegionConstIteratorWithIndex.h>
 
 #include "lp_lib.h"
+
+#include "rtkProjectionsReader.h"
 
 namespace rtk
 {
@@ -30,7 +32,7 @@ namespace rtk
 template<class TInputImage, class TOutputImage>
 FieldOfViewImageFilter<TInputImage, TOutputImage>
 ::FieldOfViewImageFilter():
-  m_Geometry(NULL),
+  m_Geometry(ITK_NULLPTR),
   m_Mask(false),
   m_Radius(-1),
   m_CenterX(0.),
@@ -70,7 +72,7 @@ bool FieldOfViewImageFilter<TInputImage, TOutputImage>
   // Build model for lpsolve with 3 variables: x, z and r
   const int Ncol = 3;
   lprec *lp = make_lp(0, Ncol);
-  if(lp == NULL)
+  if(lp == ITK_NULLPTR)
     itkExceptionMacro(<< "Couldn't construct 2 new models for the simplex solver");
 
   // Objective: maximize r
@@ -170,6 +172,8 @@ bool FieldOfViewImageFilter<TInputImage, TOutputImage>
         itkExceptionMacro(<< "Couldn't add simplex constraint");
       }
     }
+
+  AddCollimationConstraints(type, lp);
 
   set_add_rowmode(lp, FALSE); // rowmode should be turned off again when done building the model
 
@@ -365,6 +369,88 @@ void FieldOfViewImageFilter<TInputImage, TOutputImage>
     }
 }
 
+template <class TInputImage, class TOutputImage>
+void
+FieldOfViewImageFilter<TInputImage, TOutputImage>
+::AddCollimationConstraints(const FOVRadiusType type, _lprec *lp)
+{
+  const int Ncol = 3;
+  int colno[Ncol] = {1, 2, 3};
+  REAL row[Ncol];
+  for(unsigned int iProj=0; iProj<m_Geometry->GetGantryAngles().size(); iProj++)
+    {
+    const double X1 = m_Geometry->GetCollimationUInf()[iProj];
+    const double X2 = m_Geometry->GetCollimationUSup()[iProj];
+    if(X1 == std::numeric_limits<double>::max() &&
+       X2 == std::numeric_limits<double>::max())
+      {
+      continue;
+      }
+    if(X1 == std::numeric_limits<double>::max() ||
+       X2 == std::numeric_limits<double>::max())
+      {
+      itkWarningMacro("Having only one jaw that is not at the default value is unexpected.")
+      }
+
+    //Compute 3D position of jaws
+    typedef typename GeometryType::VectorType PointType;
+    typename GeometryType::HomogeneousVectorType sourceH = m_Geometry->GetSourcePosition(iProj);
+    PointType source(0.);
+    source[0] = sourceH[0];
+    source[2] = sourceH[2];
+    double sourceNorm = source.GetNorm();
+    PointType sourceDir = source/sourceNorm;
+
+    PointType v(0.);
+    v[1] = 1.;
+    PointType u = CrossProduct(v, sourceDir);
+
+    // Compute the equation of a line of the ax+by=c
+    // http://en.wikipedia.org/wiki/Linear_equation#Two-point_form
+    // Then compute the coefficient in front of r as suggested in
+    // http://www.ifor.math.ethz.ch/teaching/lectures/intro_ss11/Exercises/solutionEx11-12.pdf
+    PointType inf = u*-1.*X1;
+    double aInf = inf[2] - source[2];
+    double bInf = source[0] - inf[0];
+    double cInf = source[0] * inf[2] - inf[0] * source[2];
+    double dInf = std::sqrt(aInf*aInf + bInf*bInf);
+
+    PointType sup = u*X2;
+    double aSup = sup[2] - source[2];
+    double bSup = source[0] - sup[0];
+    double cSup = source[0] * sup[2] - sup[0] * source[2];
+    double dSup = std::sqrt(aSup*aSup + bSup*bSup);
+
+    // Check on corners
+    if( aInf*sup[0] + bInf*sup[2] >= cInf )
+      {
+      aInf *= -1.; bInf *= -1.; cInf *= -1.;
+      }
+    else if( aSup*inf[0] + bSup*inf[2] >= cSup )
+      {
+      aSup *= -1.; bSup *= -1.; cSup *= -1.;
+      }
+    else
+      {
+      itkExceptionMacro(<< "Something's wrong with the jaw handling.");
+      }
+
+    // Now add the constraints of the form ax+by+dr<=c
+    if(type==RADIUSINF || type==RADIUSBOTH)
+      {
+      row[0] = aInf; row[1] = bInf; row[2] = dInf;
+      if(!add_constraintex(lp, 3, row, colno, LE, cInf))
+        itkExceptionMacro(<< "Couldn't add simplex constraint");
+      }
+    if(type==RADIUSSUP || type==RADIUSBOTH)
+      {
+      row[0] = aSup; row[1] = bSup; row[2] = dSup;
+      if(!add_constraintex(lp, 3, row, colno, LE, cSup))
+        itkExceptionMacro(<< "Couldn't add simplex constraint");
+      }
+    }
+}
+
 } // end namespace rtk
 
-#endif // __rtkFieldOfViewImageFilter_hxx
+#endif // rtkFieldOfViewImageFilter_hxx

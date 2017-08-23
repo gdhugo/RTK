@@ -16,13 +16,15 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkFieldOfViewImageFilter_h
-#define __rtkFieldOfViewImageFilter_h
+#ifndef rtkFieldOfViewImageFilter_h
+#define rtkFieldOfViewImageFilter_h
 
 #include <itkInPlaceImageFilter.h>
 
 #include "rtkThreeDCircularProjectionGeometry.h"
 #include "rtkConfiguration.h"
+
+struct _lprec;
 
 namespace rtk
 {
@@ -99,15 +101,20 @@ public:
    * m_Geometry and ProjectionsStack must be set.*/
   virtual bool ComputeFOVRadius(const FOVRadiusType type, double &x, double &z, double &r);
 
+  /** Add collimation constraints. This function is always called from
+   * ComputeFOVRadius but it has an effect only if the geometry has the
+   * m_CollimationUInf or m_CollimationUSup which are non infinity (default). */
+  void AddCollimationConstraints(const FOVRadiusType type, _lprec *lp);
+
 protected:
   FieldOfViewImageFilter();
-  virtual ~FieldOfViewImageFilter() {};
+  ~FieldOfViewImageFilter() {}
 
-  virtual void BeforeThreadedGenerateData();
+  void BeforeThreadedGenerateData() ITK_OVERRIDE;
 
   /** Generates a FOV mask which is applied to the reconstruction
    * A call to this function will assume modification of the function.*/
-  virtual void ThreadedGenerateData( const OutputImageRegionType& outputRegionForThread, ThreadIdType threadId );
+  void ThreadedGenerateData( const OutputImageRegionType& outputRegionForThread, ThreadIdType threadId ) ITK_OVERRIDE;
 
 private:
   FieldOfViewImageFilter(const Self&);      //purposely not implemented

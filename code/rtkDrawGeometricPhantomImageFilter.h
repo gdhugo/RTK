@@ -16,8 +16,8 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkDrawGeometricPhantomImageFilter_h
-#define __rtkDrawGeometricPhantomImageFilter_h
+#ifndef rtkDrawGeometricPhantomImageFilter_h
+#define rtkDrawGeometricPhantomImageFilter_h
 
 #include <itkInPlaceImageFilter.h>
 
@@ -71,17 +71,28 @@ public:
   itkSetMacro(ConfigFile, StringType);
   itkGetMacro(ConfigFile, StringType);
 
-protected:
-  DrawGeometricPhantomImageFilter() {}
-  virtual ~DrawGeometricPhantomImageFilter() {};
+  /** Multiplicative Scaling factor for the phantom described ConfigFile. */
+  itkSetMacro(PhantomScale, VectorType);
+  itkGetMacro(PhantomScale, VectorType);
 
-  virtual void GenerateData();
+  /** Get / Set the spatial position of the phantom Shepp Logan phantom relative to its
+   * center. The default value is (0, 0, 0). */
+  itkSetMacro(OriginOffset, VectorType);
+  itkGetMacro(OriginOffset, VectorType);
+
+protected:
+  DrawGeometricPhantomImageFilter();
+  ~DrawGeometricPhantomImageFilter() {}
+
+  void GenerateData() ITK_OVERRIDE;
 
 private:
   DrawGeometricPhantomImageFilter(const Self&); //purposely not implemented
   void operator=(const Self&);            //purposely not implemented
   StringType m_ConfigFile;
 
+  VectorType m_PhantomScale;
+  VectorType m_OriginOffset;
 };
 
 } // end namespace rtk

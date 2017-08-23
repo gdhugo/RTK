@@ -16,8 +16,8 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkFourDSARTConeBeamReconstructionFilter_h
-#define __rtkFourDSARTConeBeamReconstructionFilter_h
+#ifndef rtkFourDSARTConeBeamReconstructionFilter_h
+#define rtkFourDSARTConeBeamReconstructionFilter_h
 
 #include "rtkBackProjectionImageFilter.h"
 #include "rtkForwardProjectionImageFilter.h"
@@ -35,6 +35,7 @@
 #include "rtkIterativeConeBeamReconstructionFilter.h"
 #include "rtkProjectionStackToFourDImageFilter.h"
 #include "rtkFourDToProjectionStackImageFilter.h"
+#include "rtkDisplacedDetectorImageFilter.h"
 
 namespace rtk
 {
@@ -65,6 +66,7 @@ namespace rtk
  * Subtract [ label="itk::SubtractImageFilter" URL="\ref itk::SubtractImageFilter"];
  * MultiplyByLambda [ label="itk::MultiplyImageFilter (by lambda)" URL="\ref itk::MultiplyImageFilter"];
  * Divide [ label="itk::DivideOrZeroOutImageFilter" URL="\ref itk::DivideOrZeroOutImageFilter"];
+ * Displaced [ label="rtk::DisplacedDetectorImageFilter" URL="\ref rtk::DisplacedDetectorImageFilter"];
  * ConstantProjectionStack [ label="rtk::ConstantImageSource" URL="\ref rtk::ConstantImageSource"];
  * ExtractConstantProjection [ label="itk::ExtractImageFilter" URL="\ref itk::ExtractImageFilter"];
  * RayBox [ label="rtk::RayBoxIntersectionImageFilter" URL="\ref rtk::RayBoxIntersectionImageFilter"];
@@ -95,7 +97,8 @@ namespace rtk
  * ConstantProjectionStack -> ExtractConstantProjection;
  * ExtractConstantProjection -> RayBox;
  * RayBox -> Divide;
- * Divide -> ProjectionStackToFourD;
+ * Divide -> Displaced;
+ * Displaced -> ProjectionStackToFourD;
  * ProjectionStackToFourD -> Add;
  * Add -> BeforeAdd2 [arrowhead=none];
  * BeforeAdd2 -> Add2;
@@ -140,6 +143,7 @@ public:
   typedef rtk::ProjectionStackToFourDImageFilter < VolumeSeriesType, ProjectionStackType >                ProjectionStackToFourDFilterType;
   typedef rtk::RayBoxIntersectionImageFilter<ProjectionStackType, ProjectionStackType>                    RayBoxIntersectionFilterType;
   typedef itk::DivideOrZeroOutImageFilter<ProjectionStackType, ProjectionStackType, ProjectionStackType>  DivideFilterType;
+  typedef rtk::DisplacedDetectorImageFilter<ProjectionStackType>                                          DisplacedDetectorFilterType;
   typedef rtk::ConstantImageSource<VolumeSeriesType>                                                      ConstantVolumeSeriesSourceType;
   typedef rtk::ConstantImageSource<ProjectionStackType>                                                   ConstantProjectionStackSourceType;
   typedef itk::ThresholdImageFilter<VolumeSeriesType>                                                     ThresholdFilterType;
@@ -181,26 +185,34 @@ public:
   itkSetMacro(EnforcePositivity, bool);
 
   /** Select the ForwardProjection filter */
-  void SetForwardProjectionFilter (int _arg);
+  void SetForwardProjectionFilter (int _arg) ITK_OVERRIDE;
 
   /** Select the backprojection filter */
-  void SetBackProjectionFilter (int _arg);
+  void SetBackProjectionFilter (int _arg) ITK_OVERRIDE;
 
   /** Pass the interpolation weights to subfilters */
   void SetWeights(const itk::Array2D<float> _arg);
+
+  /** Store the phase signal in a member variable */
+  virtual void SetSignal(const std::vector<double> signal);
+
+  /** Set / Get whether the displaced detector filter should be disabled */
+  itkSetMacro(DisableDisplacedDetectorFilter, bool)
+  itkGetMacro(DisableDisplacedDetectorFilter, bool)
+
 protected:
   FourDSARTConeBeamReconstructionFilter();
-  ~FourDSARTConeBeamReconstructionFilter(){}
+  ~FourDSARTConeBeamReconstructionFilter() {}
 
-  virtual void GenerateInputRequestedRegion();
+  void GenerateInputRequestedRegion() ITK_OVERRIDE;
 
-  virtual void GenerateOutputInformation();
+  void GenerateOutputInformation() ITK_OVERRIDE;
 
-  virtual void GenerateData();
+  void GenerateData() ITK_OVERRIDE;
 
   /** The two inputs should not be in the same space so there is nothing
    * to verify. */
-  virtual void VerifyInputInformation() {}
+  void VerifyInputInformation() ITK_OVERRIDE {}
 
   /** Pointers to each subfilter of this composite filter */
   typename ExtractFilterType::Pointer                     m_ExtractFilter;
@@ -216,6 +228,7 @@ protected:
   typename ProjectionStackToFourDFilterType::Pointer      m_ProjectionStackToFourDFilter;
   typename RayBoxIntersectionFilterType::Pointer          m_RayBoxFilter;
   typename DivideFilterType::Pointer                      m_DivideFilter;
+  typename DisplacedDetectorFilterType::Pointer           m_DisplacedDetectorFilter;
   typename ConstantProjectionStackSourceType::Pointer     m_ConstantProjectionStackSource;
   typename ConstantVolumeSeriesSourceType::Pointer        m_ConstantVolumeSeriesSource;
   typename ThresholdFilterType::Pointer                   m_ThresholdFilter;
@@ -224,6 +237,8 @@ protected:
   std::vector< unsigned int >                    m_ProjectionsOrder;
   bool                                           m_ProjectionsOrderInitialized;
   bool                                           m_EnforcePositivity;
+  std::vector<double>                            m_Signal;
+  bool                                           m_DisableDisplacedDetectorFilter;
 
 private:
   /** Number of projections processed before the volume is updated (1 for SART,
@@ -255,6 +270,7 @@ private:
   itk::TimeProbe m_BackProjectionProbe;
   itk::TimeProbe m_ThresholdProbe;
   itk::TimeProbe m_AddProbe;
+  itk::TimeProbe m_DisplacedDetectorProbe;
 
 }; // end of class
 

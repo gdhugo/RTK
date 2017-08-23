@@ -16,10 +16,11 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkXRadRawToAttenuationImageFilter_h
-#define __rtkXRadRawToAttenuationImageFilter_h
+#ifndef rtkXRadRawToAttenuationImageFilter_h
+#define rtkXRadRawToAttenuationImageFilter_h
 
 #include <itkImageToImageFilter.h>
+#include "rtkConfiguration.h"
 
 /** \class RawToAttenuationImageFilter
  * \brief Convert raw XRad data to attenuation images
@@ -56,12 +57,11 @@ public:
 
 protected:
   XRadRawToAttenuationImageFilter();
-  ~XRadRawToAttenuationImageFilter(){
-  }
+  ~XRadRawToAttenuationImageFilter() {}
 
-  void BeforeThreadedGenerateData();
+  void BeforeThreadedGenerateData() ITK_OVERRIDE;
 
-  virtual void ThreadedGenerateData( const OutputImageRegionType& outputRegionForThread, ThreadIdType threadId );
+  void ThreadedGenerateData( const OutputImageRegionType& outputRegionForThread, ThreadIdType threadId ) ITK_OVERRIDE;
 
 private:
   //purposely not implemented

@@ -20,13 +20,15 @@
 #define __rtkCudaBackProjectionImageFilter_hcu
 
 void
-CUDA_back_project(
-  int img_dim[2],
-  int vol_dim[3],
-  float matrix[12],
-  float *dev_vol_in,
-  float *dev_vol_out,
-  float *dev_img
-  );
+CUDA_back_project(int projSize[3],
+                  int volSize[3],
+                  float *matrices,
+                  float *volIndexToProjPPs,
+                  float *projPPToProjIndex,
+                  float *dev_vol_in,
+                  float *dev_vol_out,
+                  float *dev_img,
+                  double radiusCylindricalDetector
+                  );
 
 #endif

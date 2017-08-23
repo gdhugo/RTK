@@ -16,8 +16,8 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkImagXGeometryReader_h
-#define __rtkImagXGeometryReader_h
+#ifndef rtkImagXGeometryReader_h
+#define rtkImagXGeometryReader_h
 
 #include <itkLightProcessObject.h>
 #include "rtkThreeDCircularProjectionGeometry.h"
@@ -75,6 +75,10 @@ public:
   itkGetMacro(DetectorOffset, float);
   itkSetMacro(DetectorOffset, float);
 
+  /** Whether or not calibration data should be taken from the projections' DICOM info*/
+  itkGetMacro(ReadCalibrationFromProjections, bool);
+  itkSetMacro(ReadCalibrationFromProjections, bool);
+
 
   /** Set the vector of strings that contains the projection file names. Files
    * are processed in sequential order. */
@@ -92,9 +96,9 @@ public:
     }
 
 protected:
-  ImagXGeometryReader(): m_Geometry(NULL), m_DetectorOffset(0.f) {};
+  ImagXGeometryReader(): m_Geometry(ITK_NULLPTR), m_DetectorOffset(0.f), m_ReadCalibrationFromProjections(false) {};
 
-  ~ImagXGeometryReader() {};
+  ~ImagXGeometryReader() {}
 
 
 private:
@@ -102,13 +106,14 @@ private:
   ImagXGeometryReader(const Self&);
   void operator=(const Self&);
 
-  virtual void GenerateData();
+  void GenerateData() ITK_OVERRIDE;
 
   GeometryType::Pointer m_Geometry;
   std::string           m_CalibrationXMLFileName;
   std::string           m_RoomXMLFileName;
   FileNamesContainer    m_ProjectionsFileNames;
   float                 m_DetectorOffset;
+  bool                  m_ReadCalibrationFromProjections;
 };
 
 }
@@ -116,4 +121,4 @@ private:
 #include "rtkImagXGeometryReader.hxx"
 #endif
 
-#endif // __rtkImagXGeometryReader_h
+#endif // rtkImagXGeometryReader_h

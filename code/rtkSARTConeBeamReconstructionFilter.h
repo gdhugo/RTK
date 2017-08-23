@@ -16,8 +16,8 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkSARTConeBeamReconstructionFilter_h
-#define __rtkSARTConeBeamReconstructionFilter_h
+#ifndef rtkSARTConeBeamReconstructionFilter_h
+#define rtkSARTConeBeamReconstructionFilter_h
 
 #include "rtkBackProjectionImageFilter.h"
 #include "rtkForwardProjectionImageFilter.h"
@@ -188,27 +188,30 @@ public:
   itkSetMacro(EnforcePositivity, bool);
 
   /** Select the ForwardProjection filter */
-  void SetForwardProjectionFilter (int _arg);
+  void SetForwardProjectionFilter (int _arg) ITK_OVERRIDE;
 
   /** Select the backprojection filter */
-  void SetBackProjectionFilter (int _arg);
+  void SetBackProjectionFilter (int _arg) ITK_OVERRIDE;
 
   /** In the case of a gated SART, set the gating weights */
   void SetGatingWeights(std::vector<float> weights);
 
+  /** Set / Get whether the displaced detector filter should be disabled */
+  itkSetMacro(DisableDisplacedDetectorFilter, bool)
+  itkGetMacro(DisableDisplacedDetectorFilter, bool)
 protected:
   SARTConeBeamReconstructionFilter();
-  ~SARTConeBeamReconstructionFilter(){}
+  ~SARTConeBeamReconstructionFilter() {}
 
-  virtual void GenerateInputRequestedRegion();
+  void GenerateInputRequestedRegion() ITK_OVERRIDE;
 
-  virtual void GenerateOutputInformation();
+  void GenerateOutputInformation() ITK_OVERRIDE;
 
-  virtual void GenerateData();
+  void GenerateData() ITK_OVERRIDE;
 
   /** The two inputs should not be in the same space so there is nothing
    * to verify. */
-  virtual void VerifyInputInformation() {}
+  void VerifyInputInformation() ITK_OVERRIDE {}
 
   /** Pointers to each subfilter of this composite filter */
   typename ExtractFilterType::Pointer            m_ExtractFilter;
@@ -228,6 +231,7 @@ protected:
   typename GatingWeightsFilterType::Pointer      m_GatingWeightsFilter;
 
   bool m_EnforcePositivity;
+  bool m_DisableDisplacedDetectorFilter;
 
 private:
   /** Number of projections processed before the volume is updated (1 for SART,

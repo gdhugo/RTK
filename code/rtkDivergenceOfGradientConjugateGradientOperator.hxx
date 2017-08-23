@@ -16,8 +16,8 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkDivergenceOfGradientConjugateGradientOperator_hxx
-#define __rtkDivergenceOfGradientConjugateGradientOperator_hxx
+#ifndef rtkDivergenceOfGradientConjugateGradientOperator_hxx
+#define rtkDivergenceOfGradientConjugateGradientOperator_hxx
 #include "rtkDivergenceOfGradientConjugateGradientOperator.h"
 
 #include "itkConstShapedNeighborhoodIterator.h"
@@ -37,7 +37,7 @@ DivergenceOfGradientConjugateGradientOperator<TInputImage>
 ::DivergenceOfGradientConjugateGradientOperator()
 {
   // Default behaviour is to process all dimensions
-  for (int dim = 0; dim < TInputImage::ImageDimension; dim++)
+  for (unsigned int dim = 0; dim < TInputImage::ImageDimension; dim++)
     {
     m_DimensionsProcessed[dim] = true;
     }

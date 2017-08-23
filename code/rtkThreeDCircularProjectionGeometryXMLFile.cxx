@@ -43,6 +43,10 @@ ThreeDCircularProjectionGeometryXMLFileReader():
   m_SourceToDetectorDistance(0.),
   m_ProjectionOffsetX(0.),
   m_ProjectionOffsetY(0.),
+  m_CollimationUInf(std::numeric_limits< double >::max()),
+  m_CollimationUSup(std::numeric_limits< double >::max()),
+  m_CollimationVInf(std::numeric_limits< double >::max()),
+  m_CollimationVSup(std::numeric_limits< double >::max()),
   m_Version(0)
 {
   this->m_OutputObject = &(*m_Geometry);
@@ -69,16 +73,19 @@ StartElement(const char * name,const char **atts)
   // Check on last version of file format. Warning if not.
   if( std::string(name) == "RTKThreeDCircularGeometry" )
     {
-    while( (*atts) != NULL )
+    while( (*atts) != ITK_NULLPTR )
       {
       if( std::string(atts[0]) == "version" )
         m_Version = atoi(atts[1]);
       atts += 2;
       }
-    if(m_Version != this->CurrentVersion)
+    // Version 3 is backward compatible with version 2
+    if(  m_Version != this->CurrentVersion &&
+       !(m_Version == 2 && this->CurrentVersion == 3) )
       itkGenericExceptionMacro(<< "Incompatible version of input geometry (v" << m_Version
                                << ") with current geometry (v" << this->CurrentVersion
                                << "). You must re-generate your geometry file again.");
+    this->m_OutputObject->Clear();
     }
 }
 
@@ -120,6 +127,24 @@ EndElement(const char *name)
   if(itksys::SystemTools::Strucmp(name, "ProjectionOffsetY") == 0)
     m_ProjectionOffsetY = atof(this->m_CurCharacterData.c_str() );
 
+  if(itksys::SystemTools::Strucmp(name, "RadiusCylindricalDetector") == 0)
+    {
+    double radiusCylindricalDetector = atof(this->m_CurCharacterData.c_str() );
+    this->m_OutputObject->SetRadiusCylindricalDetector(radiusCylindricalDetector);
+    }
+
+  if(itksys::SystemTools::Strucmp(name, "CollimationUInf") == 0)
+    m_CollimationUInf = atof(this->m_CurCharacterData.c_str() );
+
+  if(itksys::SystemTools::Strucmp(name, "CollimationUSup") == 0)
+    m_CollimationUSup = atof(this->m_CurCharacterData.c_str() );
+
+  if(itksys::SystemTools::Strucmp(name, "CollimationVInf") == 0)
+    m_CollimationVInf = atof(this->m_CurCharacterData.c_str() );
+
+  if(itksys::SystemTools::Strucmp(name, "CollimationVSup") == 0)
+    m_CollimationVSup = atof(this->m_CurCharacterData.c_str() );
+
   if(itksys::SystemTools::Strucmp(name, "Matrix") == 0)
     {
     std::istringstream iss(this->m_CurCharacterData);
@@ -143,6 +168,12 @@ EndElement(const char *name)
                                         m_InPlaneAngle,
                                         m_SourceOffsetX,
                                         m_SourceOffsetY);
+
+    this->m_OutputObject->SetCollimationOfLastProjection(m_CollimationUInf,
+                                                         m_CollimationUSup,
+                                                         m_CollimationVInf,
+                                                         m_CollimationVSup);
+
     for(unsigned int i=0; i<m_Matrix.RowDimensions; i++)
       for(unsigned int j=0; j<m_Matrix.ColumnDimensions; j++)
         {
@@ -242,6 +273,38 @@ WriteFile()
                                "OutOfPlaneAngle",
                                true);
 
+  bool bCollimationUInf =
+          WriteGlobalParameter(output, indent,
+                               this->m_InputObject->GetCollimationUInf(),
+                               "CollimationUInf",
+                               false,
+                               std::numeric_limits<double>::max());
+
+  bool bCollimationUSup =
+          WriteGlobalParameter(output, indent,
+                               this->m_InputObject->GetCollimationUSup(),
+                               "CollimationUSup",
+                               false,
+                               std::numeric_limits<double>::max());
+
+  bool bCollimationVInf =
+          WriteGlobalParameter(output, indent,
+                               this->m_InputObject->GetCollimationVInf(),
+                               "CollimationVInf",
+                               false,
+                               std::numeric_limits<double>::max());
+
+  bool bCollimationVSup =
+          WriteGlobalParameter(output, indent,
+                               this->m_InputObject->GetCollimationVSup(),
+                               "CollimationVSup",
+                               false,
+                               std::numeric_limits<double>::max());
+
+  const double radius = this->m_InputObject->GetRadiusCylindricalDetector();
+  if (0. != radius)
+    WriteLocalParameter(output, indent, radius, "RadiusCylindricalDetector");
+
   // Second, write per projection parameters (if corresponding parameter is not global)
   const double radiansToDegrees = 45. / vcl_atan(1.);
   for(unsigned int i = 0; i<this->m_InputObject->GetMatrices().size(); i++)
@@ -287,6 +350,26 @@ WriteFile()
                           radiansToDegrees * this->m_InputObject->GetOutOfPlaneAngles()[i],
                           "OutOfPlaneAngle");
 
+    if(!bCollimationUInf)
+      WriteLocalParameter(output, indent,
+                          this->m_InputObject->GetCollimationUInf()[i],
+                          "CollimationUInf");
+
+    if(!bCollimationUSup)
+      WriteLocalParameter(output, indent,
+                          this->m_InputObject->GetCollimationUSup()[i],
+                          "CollimationUSup");
+
+    if(!bCollimationVInf)
+      WriteLocalParameter(output, indent,
+                          this->m_InputObject->GetCollimationVInf()[i],
+                          "CollimationVInf");
+
+    if(!bCollimationVSup)
+      WriteLocalParameter(output, indent,
+                          this->m_InputObject->GetCollimationVSup()[i],
+                          "CollimationVSup");
+
     //Matrix
     output << indent << indent;
     this->WriteStartElement("Matrix",output);
@@ -322,7 +405,8 @@ WriteGlobalParameter(std::ofstream &output,
                      const std::string &indent,
                      const std::vector<double> &v,
                      const std::string &s,
-                     bool convertToDegrees)
+                     bool convertToDegrees,
+                     double defval)
 {
   // Test if all values in vector v are equal. Return false if not.
   for(size_t i=0; i<v.size(); i++)
@@ -330,24 +414,23 @@ WriteGlobalParameter(std::ofstream &output,
       return false;
 
   // Write value in file if not 0.
-  if (0. != v[0])
+  if (defval != v[0])
     {
     double val = v[0];
     if(convertToDegrees)
       val *= 45. / vcl_atan(1.);
-    std::string ss(s);
-    output << indent;
-    this->WriteStartElement(ss, output);
-    output << val;
-    this->WriteEndElement(ss,output);
-    output << std::endl;
+
+    WriteLocalParameter(output, indent, val, s);
     }
   return true;
 }
 
 void
 ThreeDCircularProjectionGeometryXMLFileWriter::
-WriteLocalParameter(std::ofstream &output, const std::string &indent, const double &v, const std::string &s)
+WriteLocalParameter(std::ofstream &output,
+                    const std::string &indent,
+                    const double &v,
+                    const std::string &s)
 {
   std::string ss(s);
   output << indent << indent;

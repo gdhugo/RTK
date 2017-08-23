@@ -21,13 +21,14 @@
 
 #include "rtkFourDConjugateGradientConeBeamReconstructionFilter.h"
 #include "rtkThreeDCircularProjectionGeometryXMLFile.h"
-#include "rtkPhasesToInterpolationWeights.h"
-#include "rtkDisplacedDetectorImageFilter.h"
+#include "rtkSignalToInterpolationWeights.h"
+#include "rtkReorderProjectionsImageFilter.h"
 
 #ifdef RTK_USE_CUDA
   #include "itkCudaImage.h"
   #include "rtkCudaConstantVolumeSeriesSource.h"
 #endif
+
 #include <itkImageFileWriter.h>
 
 int main(int argc, char * argv[])
@@ -48,6 +49,7 @@ int main(int argc, char * argv[])
   typedef rtk::ProjectionsReader< ProjectionStackType > ReaderType;
   ReaderType::Pointer reader = ReaderType::New();
   rtk::SetProjectionsReaderFromGgo<ReaderType, args_info_rtkfourdconjugategradient>(reader, args_info);
+  TRY_AND_EXIT_ON_ITK_EXCEPTION( reader->UpdateLargestPossibleRegion() )
 
   // Geometry
   if(args_info.verbose_flag)
@@ -87,14 +89,27 @@ int main(int argc, char * argv[])
 
     inputFilter = constantImageSource;
     }
-  inputFilter->Update();
+  TRY_AND_EXIT_ON_ITK_EXCEPTION( inputFilter->Update() )
   inputFilter->ReleaseDataFlagOn();
 
-  // Read the phases file
-  rtk::PhasesToInterpolationWeights::Pointer phaseReader = rtk::PhasesToInterpolationWeights::New();
-  phaseReader->SetFileName(args_info.signal_arg);
-  phaseReader->SetNumberOfReconstructedFrames(inputFilter->GetOutput()->GetLargestPossibleRegion().GetSize(3));
-  phaseReader->Update();
+  // Re-order geometry and projections
+  // In the new order, projections with identical phases are packed together
+  std::vector<double> signal = rtk::ReadSignalFile(args_info.signal_arg);
+  typedef rtk::ReorderProjectionsImageFilter<ProjectionStackType> ReorderProjectionsFilterType;
+  ReorderProjectionsFilterType::Pointer reorder = ReorderProjectionsFilterType::New();
+  reorder->SetInput(reader->GetOutput());
+  reorder->SetInputGeometry(geometryReader->GetOutputObject());
+  reorder->SetInputSignal(signal);
+  TRY_AND_EXIT_ON_ITK_EXCEPTION( reorder->Update() )
+
+  // Release the memory holding the stack of original projections
+  reader->GetOutput()->ReleaseData();
+
+  // Compute the interpolation weights
+  rtk::SignalToInterpolationWeights::Pointer signalToInterpolationWeights = rtk::SignalToInterpolationWeights::New();
+  signalToInterpolationWeights->SetSignal(reorder->GetOutputSignal());
+  signalToInterpolationWeights->SetNumberOfReconstructedFrames(inputFilter->GetOutput()->GetLargestPossibleRegion().GetSize(3));
+  TRY_AND_EXIT_ON_ITK_EXCEPTION( signalToInterpolationWeights->Update() )
 
   // Set the forward and back projection filters to be used
   typedef rtk::FourDConjugateGradientConeBeamReconstructionFilter<VolumeSeriesType, ProjectionStackType> ConjugateGradientFilterType;
@@ -102,11 +117,15 @@ int main(int argc, char * argv[])
   conjugategradient->SetForwardProjectionFilter(args_info.fp_arg);
   conjugategradient->SetBackProjectionFilter(args_info.bp_arg);
   conjugategradient->SetInputVolumeSeries(inputFilter->GetOutput() );
-  conjugategradient->SetInputProjectionStack(reader->GetOutput());
-  conjugategradient->SetGeometry( geometryReader->GetOutputObject() );
   conjugategradient->SetNumberOfIterations( args_info.niterations_arg );
-  conjugategradient->SetWeights(phaseReader->GetOutput());
   conjugategradient->SetCudaConjugateGradient(args_info.cudacg_flag);
+  conjugategradient->SetDisableDisplacedDetectorFilter(args_info.nodisplaced_flag);
+
+  // Set the newly ordered arguments
+  conjugategradient->SetInputProjectionStack( reorder->GetOutput() );
+  conjugategradient->SetGeometry( reorder->GetOutputGeometry() );
+  conjugategradient->SetWeights(signalToInterpolationWeights->GetOutput());
+  conjugategradient->SetSignal(reorder->GetOutputSignal());
 
   itk::TimeProbe readerProbe;
   if(args_info.time_flag)
@@ -115,7 +134,7 @@ int main(int argc, char * argv[])
     readerProbe.Start();
     }
 
-  TRY_AND_EXIT_ON_ITK_EXCEPTION( conjugategradient->Update() );
+  TRY_AND_EXIT_ON_ITK_EXCEPTION( conjugategradient->Update() )
 
   if(args_info.time_flag)
     {
@@ -129,7 +148,7 @@ int main(int argc, char * argv[])
   WriterType::Pointer writer = WriterType::New();
   writer->SetFileName( args_info.output_arg );
   writer->SetInput( conjugategradient->GetOutput() );
-  TRY_AND_EXIT_ON_ITK_EXCEPTION( writer->Update() );
+  TRY_AND_EXIT_ON_ITK_EXCEPTION( writer->Update() )
 
   return EXIT_SUCCESS;
 }

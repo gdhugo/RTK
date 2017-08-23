@@ -1,15 +1,24 @@
-cmake_minimum_required (VERSION 2.8.11 FATAL_ERROR )
+cmake_minimum_required (VERSION 3.0 FATAL_ERROR )
 
 # Explicitly add INCREMENTAL linking option to command lines.
 # http://www.cmake.org/pipermail/cmake/2010-February/035174.html
-SET(MSVC_INCREMENTAL_DEFAULT ON)
+set(MSVC_INCREMENTAL_DEFAULT ON)
 
 project ( SimpleRTK )
 
-cmake_policy( VERSION 2.8.1 )
+cmake_policy( VERSION 3.0 )
+
+foreach(p
+    CMP0042 # CMake 3.0
+    CMP0063 # CMake 3.3.2
+    )
+  if(POLICY ${p})
+    cmake_policy(SET ${p} NEW)
+  endif()
+endforeach()
 
 # Include extra CMake files
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
+list(INSERT CMAKE_MODULE_PATH 0 "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
 
 #-----------------------------------------------------------------------------
 # Version information
@@ -66,7 +75,7 @@ endif()
 
 find_package(RTK REQUIRED ) # the modules needed can be listed here as required components
 if(RTK_FOUND)
-  INCLUDE(${RTK_USE_FILE})
+  include(${RTK_USE_FILE})
   link_directories( "${RTK_LIBRARY_DIRS}")
 endif()
 
@@ -131,13 +140,13 @@ option( SITK_INT64_PIXELIDS "Instantiate 64-bit integer pixels, including unsign
 option ( SITK_EXPRESS_INSTANTIATEDPIXELS "Instantiate very few pixel types ( for use for development only )" OFF )
 mark_as_advanced ( SITK_EXPRESS_INSTANTIATEDPIXELS )
 
+option( SRTK_4D_IMAGES "Add Image and I/O support for four spatial dimensions." OFF )
+mark_as_advanced( SRTK_4D_IMAGES )
 
 #-----------------------------------------------------------------------------
 # SimpleRTK build configuration options.
 option(BUILD_SHARED_LIBS "Build SimpleRTK ITK with shared libraries. This does not effect wrapped languages." OFF)
-set(SITK_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
-
-
+set(SRTK_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
 
 set(JAR_FILE "simplertk-${SimpleRTK_VERSION}.jar")
 set(JAVADOC_FILE "simplertk-javadoc-${SimpleRTK_VERSION}.jar")
@@ -252,7 +261,7 @@ if(MSVC)
       CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO
       CMAKE_SHARED_LINKER_FLAGS_DEBUG
       CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO )
-    STRING(REGEX REPLACE "INCREMENTAL(:[a-zA-Z]+)?" "INCREMENTAL:NO" ${_varName} ${${_varName}})
+    string(REGEX REPLACE "INCREMENTAL(:[a-zA-Z]+)?" "INCREMENTAL:NO" ${_varName} ${${_varName}})
   endforeach()
 
 endif()
@@ -271,7 +280,7 @@ if( CXX_HAS_fPIC )
   if(NOT "${CMAKE_CXX_FLAGS}" MATCHES "-fPIC")
     set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC" )
   endif()
-endif( )
+endif()
 
 
 
@@ -392,17 +401,17 @@ if ( BUILD_TESTING )
     message( FATAL_ERROR "BUILD_TESTING ON requires CMake 2.8.11 or newer." )
   endif()
 
-  include( SimpleRTKExternalData )
-  file( GLOB_RECURSE content_links
-    RELATIVE "${SimpleRTK_SOURCE_DIR}" "Testing/Data/*.md5" )
-  foreach(link ${content_links})
-    string( REGEX REPLACE "\\.md5$" "" link ${link} )
-    ExternalData_Expand_Arguments( SimpleRTKData
-      link_location
-      DATA{${link}}
-      )
-  endforeach()
-  ExternalData_Add_Target( SimpleRTKData )
+ # include( SimpleRTKExternalData )
+ # file( GLOB_RECURSE content_links
+ #   RELATIVE "${SimpleRTK_SOURCE_DIR}" "Testing/Data/*.md5" )
+ # foreach(link ${content_links})
+ #   string( REGEX REPLACE "\\.md5$" "" link ${link} )
+ #   ExternalData_Expand_Arguments( SimpleRTKData
+ #     link_location
+ #     DATA{${link}}
+ #     )
+ # endforeach()
+ # ExternalData_Add_Target( SimpleRTKData )
 
   enable_testing()
   add_subdirectory ( Testing )
@@ -441,7 +450,7 @@ string(REGEX REPLACE "/" ";" _count "${SimpleRTK_INSTALL_PACKAGE_DIR}")
 foreach(p ${_count})
   set(SimpleRTKConfig_CODE "${SimpleRTKConfig_CODE}
 get_filename_component(SimpleRTK_INSTALL_PREFIX \"\${SimpleRTK_INSTALL_PREFIX}\" PATH)")
-endforeach(p)
+endforeach()
 set(SimpleRTKConfig_CODE "${SimpleRTKConfig_CODE}\n")
 
 set(SimpleRTKConfig_INCLUDE_DIRS

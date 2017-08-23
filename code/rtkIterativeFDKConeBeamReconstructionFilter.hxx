@@ -16,8 +16,8 @@
  *
  *=========================================================================*/
 
-#ifndef __rtkIterativeFDKConeBeamReconstructionFilter_hxx
-#define __rtkIterativeFDKConeBeamReconstructionFilter_hxx
+#ifndef rtkIterativeFDKConeBeamReconstructionFilter_hxx
+#define rtkIterativeFDKConeBeamReconstructionFilter_hxx
 
 #include "rtkIterativeFDKConeBeamReconstructionFilter.h"
 
@@ -54,6 +54,7 @@ IterativeFDKConeBeamReconstructionFilter<TInputImage, TOutputImage, TFFTPrecisio
 
   // Filter parameters
   m_DisplacedDetectorFilter->SetPadOnTruncatedSide(false);
+  m_DisableDisplacedDetectorFilter = false;
 }
 
 template<class TInputImage, class TOutputImage, class TFFTPrecision>
@@ -111,6 +112,7 @@ IterativeFDKConeBeamReconstructionFilter<TInputImage, TOutputImage, TFFTPrecisio
 
   //Initial internal connections
   m_DisplacedDetectorFilter->SetInput( this->GetInput(1) );
+  m_DisplacedDetectorFilter->SetDisable(m_DisableDisplacedDetectorFilter);
 
   m_ParkerFilter->SetInput( m_DisplacedDetectorFilter->GetOutput() );
 
@@ -132,7 +134,7 @@ IterativeFDKConeBeamReconstructionFilter<TInputImage, TOutputImage, TFFTPrecisio
   m_DivideFilter->SetInput2( m_RayBoxFilter->GetOutput() );
 
   // Check and set geometry
-  if(this->GetGeometry().GetPointer() == NULL)
+  if(this->GetGeometry().GetPointer() == ITK_NULLPTR)
     {
     itkGenericExceptionMacro(<< "The geometry of the reconstruction has not been set");
     }
@@ -219,4 +221,4 @@ IterativeFDKConeBeamReconstructionFilter<TInputImage, TOutputImage, TFFTPrecisio
 
 } // end namespace rtk
 
-#endif // __rtkIterativeFDKConeBeamReconstructionFilter_hxx
+#endif // rtkIterativeFDKConeBeamReconstructionFilter_hxx
